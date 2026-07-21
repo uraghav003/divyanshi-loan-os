@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="referrer" content="no-referrer">
+  <base target="_top">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Divyanshi Capital AI Based OS — Voice</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #020617;
+      --card: rgba(255,255,255,0.03);
+      --border: rgba(255,255,255,0.08);
+      --blue: #2563eb;
+      --blue-light: #43a4ff;
+      --text: #f8fafc;
+      --muted: #64748b;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .console {
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 32px;
+      text-align: center;
+      backdrop-filter: blur(24px);
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+
+    .orb {
+      width: 110px;
+      height: 110px;
+      background: radial-gradient(circle at 30% 30%, #60a5fa, #2563eb 70%);
+      border-radius: 50%;
+      margin: 0 auto 28px;
+      box-shadow: 0 0 50px rgba(37,99,235,0.45);
+      animation: pulse 2.4s ease-in-out infinite;
+      position: relative;
+    }
+
+    .orb::after {
+      content: '';
+      position: absolute;
+      inset: -12px;
+      border-radius: 50%;
+      border: 1px solid rgba(67,164,255,0.25);
+      animation: ring 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(37,99,235,0.4); }
+      50% { transform: scale(1.08); box-shadow: 0 0 70px rgba(37,99,235,0.65); }
+    }
+
+    @keyframes ring {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 0.2; }
+    }
+
+    .status {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--blue-light);
+      text-transform: uppercase;
+      letter-spacing: 2.5px;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 28px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input {
+      width: 100%;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px solid var(--border);
+      padding: 16px;
+      border-radius: 16px;
+      color: white;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--blue-light);
+      box-shadow: 0 0 0 4px rgba(37,99,235,0.15);
+    }
+
+    input::placeholder {
+      color: #475569;
+      font-weight: 500;
+    }
+
+    button {
+      width: 100%;
+      padding: 16px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      font-weight: 800;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+
+    button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(37,99,235,0.4);
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .logs {
+      margin-top: 24px;
+      padding: 14px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 14px;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 48px;
+      text-align: left;
+      line-height: 1.5;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .logs.success { color: var(--success); }
+    .logs.error { color: var(--danger); }
+    .logs.loading { color: var(--blue-light); }
+  </style>
+</head>
+<body>
+  <div class="console">
+    <div class="orb"></div>
+    <div class="status" id="bridgeStatus">Verifying Secure Voice Bridge</div>
+    <h2>Voice Control</h2>
+    <p class="subtitle">Authorised outbound calls for assigned cases only</p>
+
+    <div class="input-group">
+      <input 
+        type="tel" 
+        id="phone" 
+        placeholder="+91 XXXXX XXXXX" 
+        maxlength="15"
+        inputmode="tel"
+        autocomplete="tel"
+      />
+      <button id="callBtn" onclick="triggerCall()">Initiate Voice Call</button>
+    </div>
+
+    <div id="logs" class="logs">Checking employee session and assigned case access…</div>
+  </div>
+
+  <script>
+    const phoneInput = document.getElementById('phone');
+    const callBtn = document.getElementById('callBtn');
+    const logs = document.getElementById('logs');
+    const bridgeStatus = document.getElementById('bridgeStatus');
+    const params = new URLSearchParams(location.search);
+    const EMP_CODE = String(params.get('emp') || params.get('emp_code') || '').trim().toUpperCase();
+    const ACCESS_TOKEN = String(params.get('access_token') || sessionStorage.getItem('p1_access_'+String(params.get('emp')||params.get('emp_code')||'').trim().toUpperCase()) || '').trim();
+    const LEAD_ID = String(params.get('leadId') || params.get('lead_id') || '').trim();
+    const EMP_RE = /^DC\d{1,5}$/;
+
+    // Auto-clean input
+    phoneInput.addEventListener('input', function() {
+      let val = this.value.replace(/[^\d+]/g, '');
+      if (val.startsWith('0')) val = val.slice(1);
+      if (val.length > 13) val = val.slice(0, 13);
+      this.value = val;
+    });
+
+    function cleanMobile(raw) {
+      let num = String(raw || '').replace(/\D/g, '');
+      if (num.startsWith('91') && num.length === 12) num = num.slice(2);
+      if (num.startsWith('0') && num.length === 11) num = num.slice(1);
+      return num;
+    }
+
+    function setLog(msg, type = '') {
+      logs.className = 'logs' + (type ? ' ' + type : '');
+      logs.innerText = msg;
+    }
+
+    function triggerCall() {
+      const raw = phoneInput.value.trim();
+      const mobile = cleanMobile(raw);
+
+      if (!mobile || mobile.length !== 10 || !/^[6-9]/.test(mobile)) {
+        setLog('ERROR: Enter valid 10-digit Indian mobile number', 'error');
+        phoneInput.focus();
+        return;
+      }
+
+      if (!window.google || !google.script || !google.script.run) {
+        setLog('ERROR: Backend not connected. Open via Web App URL.', 'error');
+        return;
+      }
+
+      callBtn.disabled = true;
+      callBtn.innerText = 'Connecting...';
+      setLog('CONNECTING_TO_FREEPBX → +91' + mobile + ' ...', 'loading');
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          callBtn.disabled = false;
+          callBtn.innerText = 'Initiate Voice Call';
+
+          if (res && (res.ok || res.success)) { 
+            const msg = res.message || 'Voice call request accepted';
+            setLog('VOICE_CALL_REQUESTED: ' + msg, 'success');
+          } else {
+            setLog('ERROR: ' + (res && (res.err || res.error || res.errorMessage) || 'Unknown response'), 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          callBtn.disabled = false;
+          callBtn.innerText = 'Initiate Voice Call';
+          setLog('ERROR: Bridge disconnected — ' + (err.message || err), 'error');
+        })
+        .P1_PROCESS_VOICE_COMMAND({mobile:mobile,leadId:LEAD_ID,empCode:EMP_CODE,accessToken:ACCESS_TOKEN});
+    }
+
+    function initVoice(){
+      try{if(params.get('access_token')){sessionStorage.setItem('p1_access_'+EMP_CODE,ACCESS_TOKEN);history.replaceState({},document.title,location.pathname+'?page=voice&emp='+encodeURIComponent(EMP_CODE));}}catch(_){ }
+      const preset=params.get('mobile')||'';if(preset)phoneInput.value=preset;
+      if(!EMP_RE.test(EMP_CODE)||!ACCESS_TOKEN){callBtn.disabled=true;bridgeStatus.innerText='Access Required';setLog('ERROR: Open Voice Control from your verified staff dashboard.', 'error');return;}
+      if(!window.google||!google.script||!google.script.run){callBtn.disabled=true;bridgeStatus.innerText='Preview Only';setLog('ERROR: Backend not connected. Open the deployed Web App URL.', 'error');return;}
+      bridgeStatus.innerText='Secure Session Active';setLog('Ready. Enter an assigned client mobile number.', 'success');
+    }
+
+    // Enter key support
+    phoneInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') triggerCall();
+    });
+    initVoice();
+  </script>
+</body>
+</html>

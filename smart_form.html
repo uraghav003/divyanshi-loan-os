@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta name="referrer" content="no-referrer">
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0B1F3A">
+  <title>Divyanshi Capital AI Based OS — Smart Intake</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --ink: #0a0f1e; --mid: #334155; --soft: #64748b; --line: #e2e8f0;
+      --bg: #f6f8ff; --card: #ffffff; --indigo: #4f46e5; --violet: #7c3aed;
+      --emerald: #10b981; --amber: #f59e0b; --red: #ef4444; --gold: #C9A84C;
+      --blue: #0B1F3A;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 20px 16px 60px;
+    }
+    h1, h2, h3, .brand-name { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; }
+
+    .wrap { max-width: 720px; margin: 0 auto; }
+
+    /* Header Card */
+    .header-card {
+      background: var(--blue);
+      border-radius: 28px;
+      padding: 32px 28px;
+      margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .header-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 80% at 100% 0%, rgba(79,70,229,.45) 0%, transparent 60%),
+                  radial-gradient(ellipse 40% 60% at 0% 100%, rgba(124,58,237,.3) 0%, transparent 55%);
+    }
+    .header-inner { position: relative; z-index: 1; }
+    .brand-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+    .brand-logo {
+      display: block; width: 180px; max-width: 65vw; height: auto;
+      border-radius: 10px; background: #fff; padding: 7px; flex-shrink: 0;
+    }
+    .brand-fallback { display:none;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:9px 14px;color:#0a2540;font-weight:900;letter-spacing:.04em; }
+    .brand-fallback b { display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#1559a6,#e6ad24);color:#fff; }
+    .brand-text { color: rgba(255,255,255,.5); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; font-weight: 600; }
+    .header-title { font-size: clamp(26px,5vw,42px); color: #fff; line-height: 1.05; }
+    .header-sub { color: rgba(255,255,255,.6); font-size: 13px; margin-top: 10px; max-width: 480px; line-height: 1.6; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .pill {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 5px 12px;
+      border-radius: 20px; text-transform: uppercase;
+      background: rgba(255,255,255,.1); color: rgba(255,255,255,.85);
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .pill.green  { background: rgba(16,185,129,.2); color: #6ee7b7; border-color: rgba(16,185,129,.3); }
+    .pill.blue   { background: rgba(56,189,248,.2); color: #7dd3fc; border-color: rgba(56,189,248,.3); }
+
+    /* Progress */
+    .progress-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; padding: 0 4px; }
+    .progress-step { flex: 1; height: 4px; background: var(--line); border-radius: 2px; transition: all .3s; position: relative; }
+    .progress-step.active { background: var(--indigo); }
+    .progress-step.done { background: var(--emerald); }
+    .progress-label { font-size: 10px; font-weight: 700; color: var(--soft); text-transform: uppercase; letter-spacing: .5px; margin-top: 6px; text-align: center; }
+    .progress-step::after {
+      content: attr(data-num); position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+      width: 18px; height: 18px; border-radius: 50%; background: var(--line); color: var(--soft);
+      font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center;
+      transition: all .3s;
+    }
+    .progress-step.active::after { background: var(--indigo); color: #fff; box-shadow: 0 0 0 4px rgba(79,70,229,.15); }
+    .progress-step.done::after { background: var(--emerald); color: #fff; content: '✓'; }
+
+    /* Form Card */
+    .form-card {
+      background: var(--card);
+      border-radius: 28px;
+      padding: 28px 24px;
+      border: 1.5px solid var(--line);
+      box-shadow: 0 4px 32px rgba(10,15,30,.06);
+      animation: fadeUp .5s ease;
+    }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+
+    .section-label {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 11px; font-weight: 800; letter-spacing: .14em;
+      text-transform: uppercase; color: var(--indigo);
+      margin-bottom: 14px; margin-top: 24px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label:first-child { margin-top: 0; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid1 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    @media(max-width:600px){ .grid2 { grid-template-columns: 1fr; } }
+    .col-span-2 { grid-column: 1 / -1; }
+
+    .fg { display: flex; flex-direction: column; gap: 6px; }
+    .fg label {
+      font-size: 11px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--mid);
+    }
+    .fg label span.req { color: var(--red); margin-left: 2px; }
+    .fg input, .fg select, .fg textarea {
+      background: #f8fafc;
+      border: 1.5px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 14px; font-weight: 600;
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color .18s, box-shadow .18s, background .18s;
+      width: 100%;
+    }
+    .fg input:focus, .fg select:focus, .fg textarea:focus {
+      background: #fff;
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 3px rgba(79,70,229,.12);
+    }
+    .fg input::placeholder, .fg textarea::placeholder { color: var(--soft); font-weight: 500; }
+    .fg select option { background: #fff; color: var(--ink); }
+    .fg textarea { resize: vertical; min-height: 100px; }
+    .fg input[type="file"] { cursor: pointer; font-size: 13px; padding: 10px 14px; }
+
+    .field-hint { font-size: 11px; color: var(--soft); font-weight: 500; margin-top: 3px; }
+    .field-hint.err { color: var(--red); }
+
+    /* Bank Chips */
+    .bank-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+    .bank-chip {
+      display: flex; align-items: center; gap: 6px;
+      border: 1.5px solid var(--line); border-radius: 10px;
+      padding: 8px 14px; background: #f8fafc; cursor: pointer;
+      transition: all .18s; user-select: none;
+      font-size: 12px; font-weight: 700; color: var(--mid);
+    }
+    .bank-chip:hover { border-color: var(--indigo); background: rgba(79,70,229,.04); }
+    .bank-chip.selected {
+      border-color: var(--indigo); background: rgba(79,70,229,.1);
+      color: var(--indigo); box-shadow: 0 0 0 3px rgba(79,70,229,.1);
+    }
+    .bank-chip .chk {
+      width: 14px; height: 14px; border-radius: 4px;
+      border: 1.5px solid var(--soft); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .bank-chip.selected .chk {
+      background: var(--indigo); border-color: var(--indigo);
+    }
+    .bank-chip.selected .chk::after {
+      content: '✓'; font-size: 9px; color: #fff; font-weight: 900;
+    }
+    .bank-loading { font-size: 12px; color: var(--soft); font-style: italic; padding: 8px 0; }
+
+    /* Buttons */
+    .btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .btn-submit {
+      background: linear-gradient(135deg, var(--indigo), var(--violet));
+      color: #fff; border: none; border-radius: 16px;
+      padding: 15px 32px; font-size: 14px; font-weight: 800;
+      font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: .04em;
+      cursor: pointer; flex: 1; min-width: 160px;
+      box-shadow: 0 4px 18px rgba(79,70,229,.35);
+      transition: all .2s; text-transform: uppercase;
+    }
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(79,70,229,.45);
+    }
+    .btn-submit:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .btn-reset {
+      background: transparent; color: var(--soft);
+      border: 1.5px solid var(--line); border-radius: 16px;
+      padding: 15px 20px; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all .18s;
+    }
+    .btn-reset:hover { border-color: var(--red); color: var(--red); }
+    .btn-nav {
+      background: var(--bg); color: var(--mid); border: 1.5px solid var(--line);
+      border-radius: 12px; padding: 12px 20px; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all .18s; flex: 1;
+    }
+    .btn-nav:hover { background: #e8ecf8; border-color: var(--indigo); color: var(--indigo); }
+
+    /* Status */
+    .status-bar {
+      margin-top: 18px; padding: 12px 18px; border-radius: 14px;
+      font-size: 13px; font-weight: 700; display: none; align-items: center; gap: 10px;
+    }
+    .status-bar.show { display: flex; }
+    .status-bar.loading { background: #fef9ec; color: #92400e; border: 1.5px solid #fde68a; }
+    .status-bar.success { background: #ecfdf5; color: #065f46; border: 1.5px solid #a7f3d0; }
+    .status-bar.error   { background: #fef2f2; color: #991b1b; border: 1.5px solid #fca5a5; }
+    .spin {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid currentColor; border-top-color: transparent;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-box {
+      margin-top: 18px; border-radius: 20px;
+      border: 1.5px solid var(--line); overflow: hidden; display: none;
+      animation: fadeUp .4s ease;
+    }
+    .result-box.show { display: block; }
+    .result-row {
+      padding: 16px 20px; border-bottom: 1px solid var(--line);
+      font-size: 13px; display: flex; gap: 10px;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .result-row strong { color: var(--mid); font-weight: 700; min-width: 120px; }
+    .result-row span { color: var(--ink); font-weight: 600; }
+    .result-advice {
+      background: linear-gradient(135deg,#eef2ff,#f5f3ff);
+      border-left: 4px solid var(--indigo);
+      padding: 16px 20px; margin: 0 16px 16px;
+      border-radius: 12px; font-size: 13px; color: var(--ink);
+      font-weight: 600; line-height: 1.6;
+    }
+    .result-wa {
+      background: #f0fdf4; border: 1.5px solid #bbf7d0;
+      border-radius: 16px; padding: 16px 20px; margin: 0 16px 16px;
+    }
+    .result-wa-header {
+      font-size: 12px; font-weight: 800; color: #065f46;
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+    }
+    .result-wa-text {
+      font-size: 13px; font-weight: 600; color: #1f2937;
+      white-space: pre-line; line-height: 1.7; background: #fff;
+      padding: 12px 14px; border-radius: 10px; border: 1px solid #d1fae5;
+    }
+    .btn-copy {
+      margin-top: 10px; background: var(--emerald); color: #fff;
+      border: none; border-radius: 10px; padding: 8px 18px;
+      font-size: 12px; font-weight: 800; cursor: pointer;
+      transition: all .18s;
+    }
+    .btn-copy:hover { background: #059669; transform: translateY(-1px); }
+
+    .file-list { margin-top: 8px; font-size: 12px; color: var(--mid); font-weight: 600; }
+    .file-list span { display: block; padding: 3px 0; }
+
+    .doc-checklist { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px; }
+    .doc-item { display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#f8fafc;font-size:12px;font-weight:600;color:var(--mid);line-height:1.4; }
+    .doc-item input { width:auto;margin-top:2px;accent-color:var(--indigo); }
+    .ai-monitor { margin-top:14px;padding:16px;border:1px solid #c7d2fe;border-radius:16px;background:linear-gradient(135deg,#eef2ff,#faf5ff); }
+    .ai-monitor-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-size:12px;font-weight:800;color:var(--indigo);text-transform:uppercase;letter-spacing:.06em; }
+    .ai-monitor-body { font-size:12px;line-height:1.65;color:var(--mid);font-weight:600;white-space:pre-line; }
+    .ai-state { border-radius:20px;padding:4px 9px;font-size:10px;background:#fff;border:1px solid #c7d2fe;white-space:nowrap; }
+    @media(max-width:600px){.doc-checklist{grid-template-columns:1fr;}}
+
+    .step { display: none; }
+    .step.active { display: block; animation: fadeUp .4s ease; }
+    .one-page-mode > .progress-wrap,.one-page-mode > .progress-labels,.one-page-mode .btn-nav { display:none !important; }
+    .one-page-mode #step1,.one-page-mode #step2,.one-page-mode #step3 { display:block;animation:none; }
+    .one-page-mode #step2,.one-page-mode #step3 { margin-top:28px;padding-top:4px;border-top:1px solid var(--line); }
+    .one-page-mode.success-mode #step1,.one-page-mode.success-mode #step2,.one-page-mode.success-mode #step3 { display:none; }
+    .one-page-mode.success-mode #stepSuccess { display:block; }
+
+    .hidden { display: none !important; }
+
+    /* Success Animation */
+    .success-ring {
+      width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, var(--emerald), #059669);
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;
+      font-size: 36px; color: #fff; box-shadow: 0 8px 24px rgba(16,185,129,0.3);
+      animation: popIn .5s cubic-bezier(.175,.885,.32,1.275);
+    }
+    @keyframes popIn { from { opacity: 0; transform: scale(0.5) } to { opacity: 1; transform: scale(1) } }
+  </style>
+</head>
+
+<body>
+  <input id="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0" />
+<div class="wrap">
+  <div class="header-card">
+    <div class="header-inner">
+      <div class="brand-row">
+        <img class="brand-logo" src="https://www.divyanshicapital.com/wp-content/uploads/2021/09/logo1.png" alt="Divyanshi Capital" referrerpolicy="no-referrer" onerror="this.style.display='none';document.getElementById('brandFallback').style.display='flex'">
+        <span class="brand-fallback" id="brandFallback"><b>DC</b> DIVYANSHI CAPITAL</span>
+      </div>
+      <h1 class="header-title">Smart Intake Form</h1>
+      <p class="header-sub">Fast Processing · 100% Paperless · Safe & Secure · AI Routing</p>
+      <div class="pill-row">
+        <span class="pill">Bulbhul AI Active</span>
+        <span class="pill green">Auto Attendance</span>
+        <span class="pill blue">Smart Routing</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-card one-page-mode" id="formCard">
+    <div class="progress-wrap">
+      <div class="progress-step active" data-num="1" id="stepDot1"></div>
+      <div class="progress-step" data-num="2" id="stepDot2"></div>
+      <div class="progress-step" data-num="3" id="stepDot3"></div>
+    </div>
+    <div class="progress-labels" style="display:flex;justify-content:space-between;margin-bottom:20px;font-size:10px;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.5px">
+      <span>Entry</span><span>Details</span><span>Review</span>
+    </div>
+
+    <div id="step1" class="step active">
+      <div class="section-label">Entry Details</div>
+      <div class="grid2">
+        <div class="fg">
+          <label>Entry Type</label>
+          <select id="entry_type" onchange="toggleFields()">
+            <option value="SALES_LEAD">Sales Lead</option>
+            <option value="CLIENT_ENTRY">Client Entry</option>
+            <option value="NEW_STAFF_ENTRY">New Staff Entry</option>
+            <option value="VISITOR_ENTRY">Visitor Entry</option>
+            <option value="INTERVIEW_ENTRY">Interview Entry</option>
+            <option value="BANKER_ENTRY">Banker Entry</option>
+            <option value="DOC_UPLOAD">Docs Upload</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Source Name</label>
+          <select id="source_name">
+            <option value="Sales Team">Sales Team</option>
+            <option value="Manual Calling">Manual Calling</option>
+            <option value="GoDial Auto Calling">GoDial Auto Calling</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Website">Website</option>
+            <option value="DSA">DSA</option>
+            <option value="Referral">Referral</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Email Campaign">Email Campaign</option>
+            <option value="Bank Referral">Bank Referral</option>
+            <option value="MIS">MIS</option>
+            <option value="NEW STAFF ENTRY">New Staff Entry</option>
+            <option value="INTERVIEW ENTRY">Interview Entry</option>
+            <option value="BANKER ENTRY">Banker Entry</option>
+            <option value="SEND TO LOGIN">Send to Login</option>
+            <option value="Other">Other</option>
+          </select>
+          <input type="hidden" id="manager_email_id" />
+        </div>
+        <div class="fg" id="empCodeGroup">
+          <label>Employee Code <span class="req">*</span></label>
+          <input id="emp_code" placeholder="DC002" oninput="fmtEmpCode(this)" maxlength="7" />
+          <div class="field-hint" id="empCodeHint">Format: DC + number, e.g. DC002</div>
+        </div>
+        <div class="fg" id="staffNameGroup">
+          <label>Sales / Staff Name</label>
+          <input id="sales_name" placeholder="e.g. Upendra Raghav" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-nav" onclick="goStep(2)">Continue →</button>
+      </div>
+    </div>
+
+    <div id="step2" class="step">
+      <div class="section-label" id="personSectionLabel">Client / Lead Info</div>
+      <div class="grid2">
+        <div class="fg">
+          <label>Full Name <span class="req">*</span></label>
+          <input id="client_name" placeholder="Client / Visitor / Candidate name" />
+        </div>
+        <div class="fg">
+          <label>Mobile <span class="req">*</span></label>
+          <input id="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10 digit mobile" />
+        </div>
+        <div class="fg">
+          <label>Email</label>
+          <input id="email" type="email" placeholder="name@email.com" />
+        </div>
+        <div class="fg">
+          <label>City</label>
+          <input id="city" placeholder="Delhi / Mumbai / Gurgaon" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-nav" onclick="goStep(1)">← Back</button>
+        <button class="btn-nav" onclick="goStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <div id="step3" class="step">
+      <div id="staffSection" style="display:none">
+        <div class="section-label" id="staffSectionTitle">New Staff Details</div>
+        <div class="grid2">
+          <div class="fg"><label>Designation Applied</label><input id="role_applied" placeholder="Sales Executive / Login Coordinator / HR" /></div>
+          <div class="fg"><label>Department</label><input id="department" placeholder="Sales / Login / HR / Operations" /></div>
+          <div class="fg"><label>Experience (years)</label><input id="experience_years" type="number" min="0" step="0.5" placeholder="e.g. 2" /></div>
+          <div class="fg"><label>Current Company</label><input id="current_company" placeholder="Optional" /></div>
+          <div class="fg"><label>Current CTC</label><input id="current_ctc" placeholder="Optional" /></div>
+          <div class="fg"><label>Expected CTC</label><input id="expected_ctc" placeholder="Optional" /></div>
+          <div class="fg"><label>Notice Period</label><input id="notice_period" placeholder="Immediate / 30 days" /></div>
+          <div class="fg"><label>Education</label><input id="education" placeholder="Highest qualification" /></div>
+          <div class="fg col-span-2"><label>Core Skills</label><textarea id="skills" placeholder="Sales, calling, banking, documentation, CRM, language skills…"></textarea></div>
+          <div class="fg col-span-2" id="interviewerGroup"><label>Interviewer Email</label><input id="interviewer_email" type="email" placeholder="interviewer@divyanshicapital.com" /></div>
+          <div class="fg col-span-2" id="tcGroup">
+            <label style="display:flex;gap:10px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px">
+              <input id="tc_accepted" type="checkbox" style="width:auto;margin-top:3px" />
+              <span>I have read and accept the professional <a id="tcLink" href="#" target="_blank" rel="noopener" style="color:var(--indigo);text-decoration:underline">Terms & Conditions (HR link)</a>. EMP_CODE, salary, manager and Active status will be assigned only by HR/MD after approval.</span>
+            </label>
+          </div>
+          <div class="fg col-span-2" id="candidateConsentGroup">
+            <label style="display:flex;gap:10px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px">
+              <input id="candidate_consent" type="checkbox" style="width:auto;margin-top:3px" />
+              <span>I authorize recruitment processing of my profile, resume, interview notes and reference checks under the configured retention policy, with human review. See the <a id="privacyLink" href="https://www.divyanshicapital.com" target="_blank" rel="noopener" style="color:var(--indigo);text-decoration:underline">privacy notice and grievance contact</a>.</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div id="loanSection">
+        <div class="section-label">Loan Details</div>
+        <div class="grid2">
+          <div class="fg">
+            <label>Loan Type</label>
+            <select id="loan_type" onchange="renderBankChips()">
+              <option value="">— Select Loan Type —</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Required Amount (₹)</label>
+            <input id="amount" type="number" placeholder="e.g. 500000" min="1000" />
+          </div>
+          <div class="fg">
+            <label>Employment Type</label>
+            <select id="employment_type">
+              <option value="">— Select —</option>
+              <option value="SALARIED">Salaried</option>
+              <option value="SELF_EMPLOYED">Self Employed</option>
+              <option value="BUSINESS">Business Owner</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Campaign</label>
+            <input id="campaign" placeholder="Optional campaign name" />
+          </div>
+          <div class="fg"><label>PAN Number</label><input id="pan_no" maxlength="10" placeholder="ABCDE1234F" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,10)" /></div>
+          <div class="fg"><label>Age</label><input id="age" type="number" min="18" max="80" placeholder="Applicant age" /></div>
+          <div class="fg"><label>Company / Business Name</label><input id="company_name" placeholder="Employer or business name" /></div>
+          <div class="fg"><label>Monthly Income (₹)</label><input id="monthly_income" type="number" min="0" placeholder="Net monthly income" /></div>
+          <div class="fg"><label>Existing EMI (₹)</label><input id="existing_emi" type="number" min="0" value="0" /></div>
+          <div class="fg"><label>CIBIL Score</label><input id="cibil_score" type="number" min="300" max="900" placeholder="300–900, if available" /></div>
+          <div class="fg col-span-2">
+            <label>Preferred Bank(s)</label>
+            <input type="hidden" id="preferred_bank" />
+            <div class="bank-grid" id="bankChips">
+              <div class="bank-loading">Select a loan type to see bank options…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-label">Additional Info</div>
+      <div class="grid2">
+        <div class="fg" id="followupGroup">
+          <label>Follow-up Date</label>
+          <input id="followup_date" type="date" />
+        </div>
+        <div class="fg" id="caseStatusGroup">
+          <label>Case Status</label>
+          <select id="case_status">
+            <option value="NEW_LEAD">NEW LEAD</option>
+            <option value="CALL_BACK">CALL BACK</option>
+            <option value="INTERESTED">INTERESTED</option>
+            <option value="NOT_INTERESTED">NOT INTERESTED</option>
+            <option value="STATUS_UPDATE">STATUS UPDATE</option>
+          </select>
+        </div>
+        <div class="fg col-span-2">
+          <label>Remarks / Notes</label>
+          <textarea id="remarks" placeholder="Requirements, NOB, Turnover, Running loans, visitor detail, HR note, etc."></textarea>
+        </div>
+        <div class="fg col-span-2" id="docRequirementsBlock">
+          <label>Required Document Checklist</label>
+          <div class="field-hint">Indicative checklist: selected-bank Loan_Bank_Map rules plus applicable KYC/product baseline. Final documents are determined by the lender.</div>
+          <div class="doc-checklist" id="docChecklist"><div class="bank-loading">Select loan type and employment type to load the checklist…</div></div>
+        </div>
+        <div class="fg col-span-2" id="docUploadGroup">
+          <label>Upload Documents (optional)</label>
+          <input type="file" id="docFiles" multiple accept=".pdf,.jpg,.jpeg,.png" />
+          <div class="field-hint">PDF, JPG or PNG · Max 8 files · 5MB each · 10MB total · Files save to the client’s secure Drive folder.</div>
+          <div class="field-hint">Security: never upload OTP, PIN, CVV, banking password or unmasked card details.</div>
+          <div class="file-list" id="fileList"></div>
+        </div>
+        <div class="fg col-span-2" id="clientConsentGroup">
+          <label style="display:flex;gap:10px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px">
+            <input id="data_consent" type="checkbox" style="width:auto;margin-top:3px" />
+            <span>I confirm that the information is correct and authorize Divyanshi Capital to securely process and share it with suitable lenders for eligibility, KYC and loan servicing. Redacted facts may be processed by configured AI providers for advisory assistance; no solely automated sanction decision is made. Submission is not a promise of sanction.</span>
+          </label>
+        </div>
+        <div class="fg col-span-2" id="aiConsentGroup">
+          <label style="display:flex;gap:10px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px">
+            <input id="ai_notice_accepted" type="checkbox" style="width:auto;margin-top:3px" />
+            <span>I understand that Bulbhul AI may provide redacted advisory assistance only; it does not make a sanction, KYC or lender decision. Final review remains with authorised staff and the lender.</span>
+          </label>
+        </div>
+        <div class="fg col-span-2" id="aiMonitorBlock">
+          <div class="ai-monitor">
+            <div class="ai-monitor-head"><span>🤖 Divyanshi AI Help Desk · Smart Pre-check</span><span class="ai-state" id="aiState">Monitoring</span></div>
+            <div class="ai-monitor-body" id="aiMonitorText">Complete the form. Smart pre-check identifies missing information; server AI assistance runs after submission.</div>
+            <button type="button" class="btn-copy" onclick="runAIMonitor()">Refresh Pre-check</button>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-nav" onclick="goStep(2)">← Back</button>
+        <button class="btn-submit" id="submitBtn" onclick="submitForm()">🚀 Submit & Route</button>
+      </div>
+    </div>
+
+    <div id="stepSuccess" class="step" style="text-align:center;padding:20px 0">
+      <div class="success-ring">✓</div>
+      <h2 style="color:var(--ink);margin-bottom:6px" id="successTitle">Submission Received!</h2>
+      <p style="color:var(--soft);font-size:14px;margin-bottom:16px">Reference ID: <strong id="successLeadId" style="color:var(--indigo)">—</strong></p>
+      <div id="successResult" style="text-align:left"></div>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn-submit" onclick="resetForm()">Submit Another</button>
+      </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+      <div class="spin" id="statusSpin" style="display:none"></div>
+      <span id="statusMsg"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const safe = s => String(s == null ? '' : s).replace(/[&<>"']/g, m =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m])).replace(/`/g,'&#96;');
+const isGASConnected = () => !!(window.google && google.script && google.script.run);
+const MOBILE_RE = /^[6-9]\d{9}$/;
+const EMP_RE = /^DC\d{1,5}$/i;
+
+const BULBHUL_ADVICE = {
+  'Personal Loan': '💡 Keep KYC, income proof, salary-credit bank statements and employment details ready. Eligibility and timelines depend on lender verification.',
+  'Business Loan': '💡 Keep KYC, business proof, ITR/financials, GST records and bank statements ready. Final terms depend on lender policy.',
+  'Home Loan And Lap': '💡 Keep applicant income documents and complete property title/approval papers ready for legal and technical verification.',
+  'Auto Loan': '💡 Keep KYC, income documents and vehicle quotation ready. Margin and processing depend on the selected lender.',
+  'Gold Loan': '💡 Keep KYC documents ready. Valuation, eligible amount and terms are decided after lender verification.',
+  'Working Capital': '💡 Keep business proof, financials, GST records and operating bank statements ready for assessment.',
+  'Mortgage Loan': '💡 Keep income documents and complete property ownership/title papers ready for legal and technical checks.',
+  'default': '💡 Keep accurate KYC, income and product-specific documents ready. Final approval is solely subject to lender verification.'
+};
+
+let PRODUCTS = [];
+let BANK_MAP = {};
+let selectedBanks = [];
+let currentStep = 1;
+let UPLOAD_TOKEN = '';
+let UPLOAD_TOKEN_ISSUED_AT = 0;
+let SUBMISSION_KEY = '';
+let ROUTE_SIGNATURE = '';
+let CONSENT_VERSION = '';
+let PRIVACY_NOTICE_URL = '';
+const PREVIEW_PRODUCTS = ['Personal Loan','Business Loan','Home Loan','Loan Against Property','Auto Loan','Education Loan'].map(name=>({name,documents:[]}));
+const BASE_DOCS = {
+  common:['PAN or Form 60, where applicable','One RBI-valid OVD (Aadhaar possession proof / Passport / Driving Licence / Voter ID / NREGA job card / NPR letter)','Recent photograph'],
+  salaried:['Last 3 months salary slips','Last 6 months salary-account bank statement','Form 16 or latest ITR','Employment proof / employee ID'],
+  business:['Business/constitution proof (GST / Udyam / incorporation / partnership deed)','Entity PAN and registered-address proof, where applicable','Authorised-signatory / beneficial-owner KYC and authority resolution, where applicable','Last 2 years ITR with computation','Last 2 years audited financials','Last 12 months primary bank statements','GST returns, where applicable'],
+  property:['Property title/chain documents','Sale agreement / allotment letter','Approved building plan','Latest property-tax receipt','Builder/society NOC, where applicable']
+};
+
+function init() {
+  const p = new URLSearchParams(location.search);
+  SUBMISSION_KEY = window.crypto&&crypto.randomUUID ? crypto.randomUUID() : (Date.now()+'_'+Math.random().toString(36).slice(2));
+  const setIf = (id, v) => { if (v) { const el = $(id); if(el) el.value = v; } };
+  setIf('campaign', p.get('campaign'));
+  setIf('entry_type', p.get('type'));
+  setIf('manager_email_id', p.get('manager_email_id') || p.get('manager_email'));
+  ROUTE_SIGNATURE = String(p.get('route_signature') || '').trim();
+  const emp = p.get('emp') || p.get('emp_code');
+  if (emp) { const el = $('emp_code'); if(el) el.value = emp.toUpperCase(); }
+  toggleFields();
+  setIf('source_name', p.get('source'));
+  loadLoanData();
+  if (isGASConnected()) {
+    google.script.run.withSuccessHandler(function(cfg) {
+      if (cfg && cfg.tcUrl && $('tcLink')) $('tcLink').href = cfg.tcUrl;
+      if (cfg && cfg.privacyUrl && $('privacyLink')) $('privacyLink').href = cfg.privacyUrl;
+      if (cfg) { CONSENT_VERSION=String(cfg.consentVersion||''); PRIVACY_NOTICE_URL=String(cfg.privacyUrl||''); }
+    }).P1_GET_HR_PUBLIC_CONFIG();
+    requestUploadToken();
+  }
+  const df = $('docFiles');
+  if(df) df.addEventListener('change', function() {
+    const files = Array.from(this.files || []);
+    const fl = $('fileList');
+    if(fl) fl.innerHTML = files.map(f => `<span>📎 ${safe(f.name)} (${(f.size/1024).toFixed(0)} KB)</span>`).join('');
+    runAIMonitor();
+  });
+  const mob = $('mobile');
+  if(mob) mob.addEventListener('input', function() { this.value = this.value.replace(/\D/g,'').slice(0,10); });
+  document.querySelectorAll('input,select,textarea').forEach(el=>el.addEventListener('change',()=>{if(el.id==='loan_type'||el.id==='employment_type')renderDocChecklist();runAIMonitor();}));
+  renderDocChecklist();
+  runAIMonitor();
+}
+
+function goStep(n) {
+  if (n < 0 || n > 3) return;
+  const onePageCard=$('formCard');
+  if(n!==0&&onePageCard&&onePageCard.classList.contains('one-page-mode')){
+    onePageCard.classList.remove('success-mode');
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    ['step1','step2','step3'].forEach(id=>{if($(id))$(id).classList.add('active');});
+    currentStep=1;return;
+  }
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const target = $('step' + (n === 0 ? 'Success' : n));
+  if(target) target.classList.add('active');
+  const card=$('formCard');if(card)card.classList.toggle('success-mode',n===0);
+  currentStep = n;
+  for (let i = 1; i <= 3; i++) {
+    const dot = $('stepDot' + i);
+    if(!dot) continue;
+    dot.classList.remove('active','done');
+    if (i < n) dot.classList.add('done');
+    else if (i === n) dot.classList.add('active');
+  }
+}
+
+function fmtEmpCode(el) {
+  let v = el.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!v.startsWith('DC')) v = 'DC' + v.replace(/^[DC]+/, '');
+  v = v.slice(0, 7);
+  el.value = v;
+  const hint = $('empCodeHint');
+  if (!hint) return;
+  if (v && !EMP_RE.test(v)) { hint.textContent = '⚠ Must be DC + digits, e.g. DC002'; hint.className = 'field-hint err'; }
+  else { hint.textContent = 'Format: DC + number, e.g. DC002'; hint.className = 'field-hint'; }
+}
+
+function toggleFields() {
+  const typeEl = $('entry_type');
+  const loanSec = $('loanSection'),staffSec=$('staffSection');
+  if(!typeEl || !loanSec || !staffSec) return;
+  const isPeople=['NEW_STAFF_ENTRY','INTERVIEW_ENTRY'].includes(typeEl.value);
+  const showLoan = ['SALES_LEAD','CLIENT_ENTRY','BANKER_ENTRY','DOC_UPLOAD'].includes(typeEl.value);
+  loanSec.style.display = showLoan ? 'block' : 'none';
+  staffSec.style.display = isPeople ? 'block' : 'none';
+  $('empCodeGroup').style.display='none';
+  $('staffNameGroup').style.display='none';
+  $('tcGroup').style.display=typeEl.value==='NEW_STAFF_ENTRY'?'block':'none';
+  $('candidateConsentGroup').style.display=isPeople?'flex':'none';
+  $('interviewerGroup').style.display=typeEl.value==='INTERVIEW_ENTRY'?'block':'none';
+  $('staffSectionTitle').textContent=typeEl.value==='INTERVIEW_ENTRY'?'Interview Details':'New Staff Details';
+  $('personSectionLabel').textContent=isPeople?'Candidate Information':'Client / Lead Info';
+  $('email').parentElement.querySelector('label').innerHTML=isPeople?'Email <span class="req">*</span>':'Email';
+  $('docRequirementsBlock').style.display=showLoan?'flex':'none';
+  $('aiConsentGroup').style.display=showLoan?'flex':'none';
+  $('clientConsentGroup').style.display=isPeople?'none':'flex';
+  $('followupGroup').style.display=isPeople?'none':'block';
+  $('caseStatusGroup').style.display=isPeople?'none':'block';
+  $('docUploadGroup').style.display=isPeople?'none':'block';
+  const sourceByType={SALES_LEAD:'Sales Team',CLIENT_ENTRY:'Website',NEW_STAFF_ENTRY:'NEW STAFF ENTRY',VISITOR_ENTRY:'Walk-in',INTERVIEW_ENTRY:'INTERVIEW ENTRY',BANKER_ENTRY:'BANKER ENTRY',DOC_UPLOAD:'Website'};
+  $('source_name').value=sourceByType[typeEl.value]||'Other';
+  if(isPeople){$('emp_code').value='';$('sales_name').value='';const df=$('docFiles');if(df)df.value='';const fl=$('fileList');if(fl)fl.innerHTML='';}
+  renderDocChecklist();runAIMonitor();
+}
+
+function requestUploadToken(){
+  if(!isGASConnected())return Promise.resolve('');
+  if(!SUBMISSION_KEY)SUBMISSION_KEY=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+'_'+Math.random().toString(36).slice(2));
+  const route=String($('manager_email_id')&&$('manager_email_id').value||'').trim().toLowerCase()||String($('emp_code')&&$('emp_code').value||'').trim().toUpperCase();
+  return new Promise((resolve,reject)=>google.script.run
+    .withSuccessHandler(function(token){UPLOAD_TOKEN=String(token||'');UPLOAD_TOKEN_ISSUED_AT=Date.now();resolve(UPLOAD_TOKEN);})
+    .withFailureHandler(reject).P1_ISSUE_UPLOAD_TOKEN(SUBMISSION_KEY,route));
+}
+
+function loadLoanData() {
+  populateLoanTypes(PREVIEW_PRODUCTS);
+  PRODUCTS = PREVIEW_PRODUCTS;
+  BANK_MAP = {};
+  if (!isGASConnected()) { setStatus('Preview mode: full form is visible. Live banks/doc rules load from Loan_Bank_Map after deployment.', 'loading'); renderDocChecklist(); return; }
+  google.script.run
+    .withSuccessHandler(function(catalog) {
+      PRODUCTS = catalog && Array.isArray(catalog.products) ? catalog.products : [];
+      BANK_MAP = catalog && catalog.banks ? catalog.banks : {};
+      populateLoanTypes(PRODUCTS);
+      renderBankChips();
+      renderDocChecklist();runAIMonitor();
+    })
+    .withFailureHandler(function(err) { setStatus('Loan_Bank_Map load failed: ' + safe(err && err.message ? err.message : err), 'error'); })
+    .P1_GET_LOAN_CATALOG();
+}
+
+function populateLoanTypes(products) {
+  const sel = $('loan_type');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— Select Loan Type —</option>' + products.map(p => `<option value="${safe(p.name)}">${safe(p.name)}</option>`).join('');
+}
+
+function renderBankChips() {
+  const loanEl = $('loan_type');
+  const box = $('bankChips');
+  if(!loanEl || !box) return;
+  const loan = (loanEl.value || '').toUpperCase();
+  selectedBanks = [];
+  const pb = $('preferred_bank');
+  if(pb) pb.value = '';
+  const banks = BANK_MAP[loan] || BANK_MAP['OTHER'] || [];
+  if (!loan) { box.innerHTML = '<div class="bank-loading">Select a loan type to see bank options…</div>'; return; }
+  if (!banks.length) { box.innerHTML = '<div class="bank-loading">No banks configured for this type.</div>'; return; }
+  box.innerHTML = banks.map(b => `<div class="bank-chip" onclick="toggleChip(this)" data-bank="${safe(b)}"><div class="chk"></div><span>${safe(b)}</span></div>`).join('');
+}
+
+function getRequiredDocs(){
+  const loan=String($('loan_type')&&$('loan_type').value||'').toUpperCase(),emp=String($('employment_type')&&$('employment_type').value||'').toUpperCase();
+  const product=PRODUCTS.find(p=>String(p.name||'').toUpperCase()===loan),selected=selectedBanks.map(x=>String(x).toUpperCase());
+  const bankDocs=(product&&Array.isArray(product.rules)?product.rules:[]).filter(r=>!selected.length||selected.includes(String(r.bank||'').toUpperCase())).flatMap(r=>String(r.documentsRequired||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean));
+  const docs=Array.from(new Set([...(product&&Array.isArray(product.documents)?product.documents:[]),...bankDocs]));
+  const add=list=>(list||[]).forEach(x=>{if(!docs.some(d=>String(d).toUpperCase()===String(x).toUpperCase()))docs.push(x);});
+  add(BASE_DOCS.common);
+  if(emp==='SALARIED')add(BASE_DOCS.salaried);else if(emp==='SELF_EMPLOYED'||emp==='BUSINESS')add(BASE_DOCS.business);
+  if(/HOME|PROPERTY|MORTGAGE|LAP/.test(loan))add(BASE_DOCS.property);
+  if(/AUTO|VEHICLE|CAR/.test(loan))add(['Vehicle quotation / proforma invoice']);
+  if(/EDUCATION/.test(loan))add(['Admission/offer letter','Course fee structure','Academic records','Co-applicant income documents']);
+  if(/TAKEOVER|BALANCE TRANSFER/.test(loan))add(['Existing loan statement','Existing sanction letter','Foreclosure / outstanding letter']);
+  return docs;
+}
+
+function renderDocChecklist(){
+  const box=$('docChecklist');if(!box)return;
+  const docs=getRequiredDocs();
+  box.innerHTML=docs.length?docs.map((d,i)=>`<label class="doc-item"><input type="checkbox" class="doc-check" value="${safe(d)}" onchange="runAIMonitor()"><span>${safe(d)}</span></label>`).join(''):'<div class="bank-loading">Select loan type and employment type to load the checklist…</div>';
+}
+
+function runAIMonitor(){
+  const text=$('aiMonitorText'),state=$('aiState');if(!text||!state)return;
+  const type=$('entry_type')?$('entry_type').value:'',people=['NEW_STAFF_ENTRY','INTERVIEW_ENTRY'].includes(type),missing=[];
+  if(!String($('client_name')&&$('client_name').value||'').trim())missing.push(people?'candidate name':'client name');
+  if(!MOBILE_RE.test(String($('mobile')&&$('mobile').value||'')))missing.push('valid mobile');
+  if(people&&!String($('email')&&$('email').value||'').trim())missing.push('email');
+  const loanFlow=['SALES_LEAD','CLIENT_ENTRY','BANKER_ENTRY','DOC_UPLOAD'].includes(type);
+  if(loanFlow){
+    if(!String($('loan_type')&&$('loan_type').value||''))missing.push('loan type');
+    if(!String($('employment_type')&&$('employment_type').value||''))missing.push('employment type');
+    if(!String($('amount')&&$('amount').value||''))missing.push('required amount');
+  }
+  const required=loanFlow?getRequiredDocs():[],checked=Array.from(document.querySelectorAll('.doc-check:checked')).length,files=Array.from($('docFiles')&&$('docFiles').files||[]);
+  const docLine=!loanFlow?`${files.length} attachment(s) selected.`:`${checked}/${required.length} checklist items declared; ${files.length} file(s) selected for server AI/human review.`;
+  state.textContent=missing.length?'Action needed':files.length?'Ready for AI audit':'Monitoring';
+  state.style.color=missing.length?'#991b1b':files.length?'#065f46':'#4f46e5';
+  text.textContent=(missing.length?`Complete: ${missing.join(', ')}.\n`:'Core information looks ready.\n')+docLine+'\nThis is assistance/pre-screening only. Final eligibility, KYC and document acceptance require authorised staff/lender verification.';
+}
+
+function toggleChip(el) {
+  const bank = el.dataset.bank;
+  if(!bank) return;
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) { if (!selectedBanks.includes(bank)) selectedBanks.push(bank); }
+  else { selectedBanks = selectedBanks.filter(b => b !== bank); }
+  const pb = $('preferred_bank');
+  if(pb) pb.value = selectedBanks.join(',');
+  renderDocChecklist();runAIMonitor();
+}
+
+function setStatus(msg, type) {
+  const bar = $('statusBar');
+  if(!bar) return;
+  bar.className = 'status-bar show ' + (type || 'loading');
+  const spin = $('statusSpin');
+  if(spin) spin.style.display = type === 'loading' ? 'block' : 'none';
+  const sm = $('statusMsg');
+  if(sm) sm.textContent = msg;
+}
+function clearStatus() { const bar = $('statusBar'); if(bar) bar.className = 'status-bar'; }
+
+function validate(p) {
+  const isPeople=['NEW_STAFF_ENTRY','INTERVIEW_ENTRY'].includes(p.entry_type);
+  const isLoanFlow=['SALES_LEAD','CLIENT_ENTRY','BANKER_ENTRY','DOC_UPLOAD'].includes(p.entry_type);
+  if (!p.client_name || p.client_name.length < 2) return (isPeople?'Candidate':'Client')+' name required (min 2 chars)';
+  if (!MOBILE_RE.test(String(p.client_mobile || '').trim())) return 'Valid 10-digit mobile required (starts 6-9)';
+  if (isPeople&&!p.client_email) return 'Candidate email required for HR approval and joining kit';
+  if (isPeople&&!p.candidate_consent) return 'Candidate privacy consent required';
+  if (isLoanFlow&&!p.loan_type) return 'Loan type required';
+  if (isLoanFlow&&!p.employment_type) return 'Employment type required';
+  if (isLoanFlow&&(!Number.isFinite(Number(p.required_loan_amount))||Number(p.required_loan_amount)<1000)) return 'Required amount must be at least INR 1,000';
+  if (p.age!==''&&(!Number.isFinite(Number(p.age))||Number(p.age)<18||Number(p.age)>80)) return 'Age must be between 18 and 80';
+  if (p.monthly_income!==''&&(!Number.isFinite(Number(p.monthly_income))||Number(p.monthly_income)<0)) return 'Monthly income cannot be negative';
+  if (p.existing_emi!==''&&(!Number.isFinite(Number(p.existing_emi))||Number(p.existing_emi)<0)) return 'Existing EMI cannot be negative';
+  if (p.cibil_score!==''&&(!Number.isFinite(Number(p.cibil_score))||Number(p.cibil_score)<300||Number(p.cibil_score)>900)) return 'CIBIL score must be between 300 and 900';
+  if (p.entry_type==='DOC_UPLOAD'&&(!p.files_count||p.files_count<1)) return 'Select at least one document to upload';
+  if (!isPeople&&!p.manager_email_id&&!p.emp_code) return 'This link is not assigned to a manager. Open the form from the staff panel.';
+  if (!isPeople&&p.emp_code&&!EMP_RE.test(p.emp_code)) return 'EMP code format wrong - use DC + number (e.g. DC002)';
+  if (p.entry_type==='NEW_STAFF_ENTRY'&&!p.tc_accepted) return 'Terms & Conditions acceptance required';
+  if (!isPeople&&!p.data_consent) return 'Data processing consent required';
+  if (p.client_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.client_email)) return 'Invalid email format';
+  return '';
+}
+
+function buildWAMsg(p) {
+  const name = (p.client_name || '').split(' ')[0];
+  const loan = p.loan_type || 'your requirement';
+  const adv = BULBHUL_ADVICE[p.loan_type] || BULBHUL_ADVICE.default;
+  return `Hi ${name}, Divyanshi Capital me aapka swagat hai! ✅\n\nAapki ${loan} request received ho gayi hai.\n\n${adv}\n\nHamari team 2 ghante me call karegi.\n📞 Urgent: +91-9899032117\n\n— Team Divyanshi Capital`;
+}
+
+function showResult(lid, p, docAudit) {
+  const waMsg = buildWAMsg(p);
+  const advice = BULBHUL_ADVICE[p.loan_type] || BULBHUL_ADVICE.default;
+  const isStaff = p.entry_type === 'NEW_STAFF_ENTRY';
+  const isInterview = p.entry_type === 'INTERVIEW_ENTRY';
+  const box = $('successResult');
+  if(!box) return;
+  box.innerHTML = `
+    <div style="background:#f8fafc;border-radius:16px;padding:20px;text-align:left;border:1px solid var(--line);margin-bottom:16px">
+      <div class="result-row"><strong>Reference ID</strong><span>${safe(lid || '—')}</span></div>
+      ${!isStaff&&!isInterview?`<div class="result-row"><strong>Employee</strong><span>${safe(p.emp_code)} — ${safe(p.sales_name || '')}</span></div>`:''}
+      <div class="result-row"><strong>${isStaff||isInterview?'Candidate':'Client'}</strong><span>${safe(p.client_name)} · ${safe(p.client_mobile)}</span></div>
+      ${p.loan_type ? `<div class="result-row"><strong>Loan</strong><span>${safe(p.loan_type)} · ₹${Number(p.required_loan_amount||0).toLocaleString('en-IN')}</span></div>` : ''}
+      <div class="result-row"><strong>Status</strong><span>${isStaff?'Pending HR/MD approval — EMP_CODE will be assigned by HR':isInterview?'Interview recorded and resume profile created':'✅ Logged & Routed to COMMON_ENTRY'}</span></div>
+    </div>
+    ${isStaff||isInterview?'':`<div class="result-advice">${docAudit ? `<strong>🏦 Bulbhul AI Analysis</strong><br>${safe(docAudit)}` : safe(advice)}</div>
+    <div class="result-wa">
+      <div class="result-wa-header">📱 WhatsApp Thank-You Message</div>
+      <div class="result-wa-text" id="waMsgText">${safe(waMsg)}</div>
+      <button class="btn-copy" onclick="copyText(document.getElementById('waMsgText').textContent)">📋 Copy Message</button>
+    </div>`}
+  `;
+  if ($('successTitle')) $('successTitle').textContent = isStaff ? 'New Staff Entry Received!' : isInterview ? 'Interview Entry Received!' : 'Submission Received!';
+  const lidEl = $('successLeadId');
+  if(lidEl) lidEl.innerText = safe(lid || '—');
+}
+
+function copyText(text) {
+  if(!text) return;
+  navigator.clipboard.writeText(text)
+    .then(() => setStatus('✅ Copied to clipboard!', 'success'))
+    .catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); setStatus('✅ Copied!', 'success'); });
+  setTimeout(() => clearStatus(), 2500);
+}
+
+function resetForm() {
+  ['emp_code','sales_name','client_name','mobile','email','city','amount','campaign','remarks','followup_date','role_applied','department','experience_years','current_company','current_ctc','expected_ctc','notice_period','education','skills','interviewer_email','pan_no','age','company_name','monthly_income','cibil_score'].forEach(id => { const el = $(id); if(el) el.value = ''; });
+  if($('existing_emi'))$('existing_emi').value='0';
+  const tc=$('tc_accepted');if(tc)tc.checked=false;
+  const candidateConsent=$('candidate_consent');if(candidateConsent)candidateConsent.checked=false;
+  const consent=$('data_consent');if(consent)consent.checked=false;
+  const aiConsent=$('ai_notice_accepted');if(aiConsent)aiConsent.checked=false;
+  const et = $('entry_type'); if(et) et.value = 'SALES_LEAD';
+  const sn = $('source_name'); if(sn) sn.value = 'Sales Team';
+  const lt = $('loan_type'); if(lt) lt.value = '';
+  const etype = $('employment_type'); if(etype) etype.value = '';
+  const cs = $('case_status'); if(cs) cs.value = 'NEW_LEAD';
+  const pb = $('preferred_bank'); if(pb) pb.value = '';
+  const df = $('docFiles'); if(df) df.value = '';
+  const fl = $('fileList'); if(fl) fl.innerHTML = '';
+  selectedBanks = [];
+  const bc = $('bankChips');
+  if(bc) bc.innerHTML = '<div class="bank-loading">Select a loan type to see bank options…</div>';
+  const hint = $('empCodeHint');
+  if(hint){ hint.textContent = 'Format: DC + number, e.g. DC002'; hint.className = 'field-hint'; }
+  clearStatus();
+  toggleFields();
+  renderDocChecklist();runAIMonitor();
+  goStep(1);
+}
+
+const fileToB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
+
+async function submitForm() {
+  const btn = $('submitBtn');
+  if (!btn || btn.disabled) return;
+  const payload = {
+    api: 'WEB_LEAD',
+    emp_code: $('emp_code') ? $('emp_code').value.trim().toUpperCase() : '',
+    sales_name: $('sales_name') ? $('sales_name').value.trim() : '',
+    client_name: $('client_name') ? $('client_name').value.trim() : '',
+    client_mobile: $('mobile') ? $('mobile').value.trim() : '',
+    client_email: $('email') ? $('email').value.trim() : '',
+    city_location: $('city') ? $('city').value.trim() : '',
+    pan_no: $('pan_no') ? $('pan_no').value.trim() : '',
+    age: $('age') ? $('age').value : '',
+    company_name: $('company_name') ? $('company_name').value.trim() : '',
+    monthly_income: $('monthly_income') ? $('monthly_income').value : '',
+    existing_emi: $('existing_emi') ? $('existing_emi').value : '0',
+    cibil_score: $('cibil_score') ? $('cibil_score').value : '',
+    loan_type: $('loan_type') ? $('loan_type').value : '',
+    required_loan_amount: $('amount') ? $('amount').value.trim() : '',
+    employment_type: $('employment_type') ? $('employment_type').value : '',
+    preferred_bank: $('preferred_bank') ? $('preferred_bank').value.trim() : '',
+    source_name: $('source_name') ? $('source_name').value.trim() : 'DC_WEB_PORTAL',
+    remarks: $('remarks') ? $('remarks').value.trim() : '',
+    entry_type: $('entry_type') ? $('entry_type').value : '',
+    case_status: $('case_status') ? $('case_status').value : '',
+    campaign: $('campaign') ? $('campaign').value.trim() : '',
+    followup_date: $('followup_date') ? $('followup_date').value : '',
+    role_applied: $('role_applied') ? $('role_applied').value.trim() : '',
+    department: $('department') ? $('department').value.trim() : '',
+    experience_years: $('experience_years') ? $('experience_years').value : '',
+    current_company: $('current_company') ? $('current_company').value.trim() : '',
+    current_ctc: $('current_ctc') ? $('current_ctc').value.trim() : '',
+    expected_ctc: $('expected_ctc') ? $('expected_ctc').value.trim() : '',
+    notice_period: $('notice_period') ? $('notice_period').value.trim() : '',
+    education: $('education') ? $('education').value.trim() : '',
+    skills: $('skills') ? $('skills').value.trim() : '',
+    interviewer_email: $('interviewer_email') ? $('interviewer_email').value.trim() : '',
+    tc_accepted: $('tc_accepted') ? $('tc_accepted').checked : false,
+    candidate_consent: $('candidate_consent') ? $('candidate_consent').checked : false,
+    ai_notice_accepted: $('ai_notice_accepted') ? $('ai_notice_accepted').checked : false,
+    marketing_consent: false,
+    manager_email_id: $('manager_email_id') ? $('manager_email_id').value.trim() : '',
+    route_signature: ROUTE_SIGNATURE,
+    consent_version: CONSENT_VERSION,
+    consent_at: new Date().toISOString(),
+    consent_source: 'WEB_APP',
+    privacy_notice_url: PRIVACY_NOTICE_URL,
+    website: $('website') ? $('website').value.trim() : '',
+    data_consent: $('data_consent') ? $('data_consent').checked : false,
+    upload_token: UPLOAD_TOKEN,
+    submission_key: SUBMISSION_KEY,
+    timestamp: new Date().toISOString(),
+    check_in_time: null,
+    selected_documents: Array.from(document.querySelectorAll('.doc-check:checked')).map(x=>x.value),
+    files_count: Array.from($('docFiles') ? $('docFiles').files || [] : []).length
+  };
+  const errMsg = validate(payload);
+  if (errMsg) { setStatus('❌ ' + errMsg, 'error'); return; }
+  const rawFiles = Array.from($('docFiles') ? $('docFiles').files || [] : []);
+  if (rawFiles.length > 8) { setStatus('❌ Max 8 files allowed', 'error'); return; }
+  const big = rawFiles.find(f => f.size > 5 * 1024 * 1024);
+  if (big) { setStatus('❌ "' + big.name + '" exceeds 5MB', 'error'); return; }
+  const totalSize=rawFiles.reduce((s,f)=>s+f.size,0);
+  if(totalSize>10*1024*1024){setStatus('❌ Total upload exceeds 10MB', 'error');return;}
+  if (!isGASConnected()) {
+    setStatus('Preview only — nothing was saved. Open the deployed Apps Script web app to submit.', 'error');
+    return;
+  }
+  btn.disabled = true;
+  SUBMISSION_KEY=SUBMISSION_KEY||(window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+'_'+Math.random().toString(36).slice(2)));
+  payload.submission_key=SUBMISSION_KEY;
+  if(rawFiles.length&&(!UPLOAD_TOKEN||Date.now()-UPLOAD_TOKEN_ISSUED_AT>15*60*1000)){
+    setStatus('Securing upload session…','loading');
+    try{await requestUploadToken();payload.upload_token=UPLOAD_TOKEN;}catch(te){btn.disabled=false;setStatus('❌ Could not secure upload session. Retry.','error');return;}
+  }
+  setStatus('Reading files…', 'loading');
+  try {
+    payload.files = await Promise.all(rawFiles.map(async f => ({ name: f.name, mimeType: f.type || 'application/octet-stream', base64: await fileToB64(f) })));
+  } catch (fe) { btn.disabled = false; setStatus('❌ File read error: ' + safe(fe.message || fe), 'error'); return; }
+  setStatus('Routing to DC engine…', 'loading');
+  let settled = false;
+  const guard = setTimeout(() => { if (settled) return; setStatus('⏳ Still processing securely. Do not resubmit; the result will appear automatically.', 'loading'); }, 28000);
+  google.script.run
+    .withSuccessHandler(function(res) {
+      settled = true; clearTimeout(guard); btn.disabled = false;
+      if (res && (res.ok || res.success)) {
+        setStatus(payload.entry_type==='NEW_STAFF_ENTRY'?'✅ New staff entry sent for HR/MD approval':payload.entry_type==='INTERVIEW_ENTRY'?'✅ Interview recorded and candidate profile created':'✅ Lead successfully routed to COMMON_ENTRY', 'success');
+        goStep(0);
+        showResult(res.leadId || res.lid, payload, res.docAudit || null);
+        const df = $('docFiles'); if(df) df.value = '';
+        const fl = $('fileList'); if(fl) fl.innerHTML = '';
+        SUBMISSION_KEY='';requestUploadToken();
+      } else {
+        requestUploadToken();
+        setStatus('❌ Submit failed: ' + safe((res && (res.err || res.errorMessage)) || 'Unknown error'), 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      settled = true; clearTimeout(guard); btn.disabled = false;
+      requestUploadToken();
+      setStatus('❌ GAS connection failed: ' + safe(err && err.message ? err.message : String(err)), 'error');
+    })
+    .P1_SMART_FORM_SUBMIT(payload);
+}
+
+init();
+</script>
+</body>
+</html>

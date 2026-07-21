@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="referrer" content="no-referrer">
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Divyanshi Capital AI Based OS</title>
+  <meta name="description" content="Divyanshi Capital - Smart Loan Support for Personal Loan, Business Loan, Home Loan, LAP and Auto Loan.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
+    h1,h2,h3,h4,.logo,.btn{font-family:'Outfit',sans-serif}
+    :root{
+      --blue:#0B1F3A;--blue2:#1a3a6b;--gold:#C9A84C;--gold-hover:#b8932e;
+      --orange:#F97316;--bg:#060f1e;--card:#0d1d3a;--muted:#94A3B8;
+      --line:#e2e8f0;--green:#10b981;--red:#ef4444;--white:#ffffff;
+    }
+    body{background:#f8fafc;color:#0a1628;overflow-x:hidden}
+    a{text-decoration:none;color:inherit}
+    input,select,textarea,button{font-family:inherit}
+
+    .topbar{background:var(--blue);color:#fff;padding:10px 5%;font-size:13px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .header{background:rgba(255,255,255,0.95);backdrop-filter:blur(12px);padding:14px 5%;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,0.03);position:sticky;top:0;z-index:50;border-bottom:1px solid #e2e8f0}
+    .logo{display:flex;align-items:center}
+    .logo img{display:block;height:42px;width:auto;max-width:210px;object-fit:contain}
+    .identity-logo{display:block;width:172px;max-width:100%;height:auto;background:#fff;border-radius:8px;padding:7px}
+    .nav{display:flex;gap:28px;align-items:center}
+    .nav a{font-size:14px;font-weight:600;color:#334155;transition:color .2s;position:relative;padding:4px 0}
+    .nav a:hover,.nav a.active{color:var(--gold)}
+    .nav a.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:var(--gold);border-radius:2px}
+
+    .btn{background:var(--gold);color:#000;border:0;border-radius:10px;padding:11px 22px;font-weight:800;font-size:14px;cursor:pointer;display:inline-block;transition:all .25s;box-shadow:0 4px 12px rgba(212,175,55,.2)}
+    .btn:hover{background:var(--gold-hover);transform:translateY(-2px)}
+    .btn:disabled{opacity:.5;pointer-events:none}
+    .btn.orange{background:var(--orange);color:#fff}
+
+    .staff-banner{background:linear-gradient(135deg,var(--gold),#fcd34d);color:#0f172a;padding:11px 5%;text-align:center;font-weight:800;font-size:13px}
+
+    .hero{background:radial-gradient(circle at top right,var(--blue2),var(--blue));color:#fff;padding:70px 5%;display:grid;grid-template-columns:1.15fr .85fr;gap:50px;align-items:center}
+    .hero h1{font-size:46px;line-height:1.15;margin-bottom:18px;font-weight:900}
+    .hero p{font-size:16px;line-height:1.7;color:#cbd5e1;margin-bottom:28px}
+    .hero-card{background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.25);border-radius:22px;padding:30px}
+    .hero-card h3{color:var(--gold);font-size:19px;margin-bottom:16px;font-weight:800}
+    .hero-card li{margin:12px 0;font-size:15px;list-style:none;display:flex;align-items:center;gap:10px;color:#e2e8f0}
+
+    .section{padding:70px 5%}
+    .title{text-align:center;color:var(--blue);font-size:34px;font-weight:800;margin-bottom:36px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:24px}
+    .loan-card,.feature-card{border:1px solid var(--line);border-radius:18px;padding:28px 22px;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.02);transition:all .3s;text-align:center}
+    .loan-card{cursor:pointer}
+    .loan-card:hover,.feature-card:hover{transform:translateY(-5px);border-color:var(--gold);box-shadow:0 16px 32px rgba(0,0,0,.07)}
+    .icon{font-size:44px;margin-bottom:14px;display:inline-block}
+    .loan-card h3,.feature-card h3{color:var(--blue);font-size:19px;margin-bottom:10px;font-weight:800}
+
+    .calculator{background:#f1f5f9;padding:70px 5%}
+    .box,.form-box,.calling-box{max-width:600px;margin:0 auto;background:#fff;border-radius:22px;padding:36px;box-shadow:0 16px 36px rgba(0,0,0,.05);border:1px solid var(--line)}
+    input,select,textarea{width:100%;padding:13px 14px;border:1px solid #cbd5e1;border-radius:11px;margin:9px 0;font-size:14px;font-weight:600;background:#f8fafc;transition:all .2s}
+    input:focus,select:focus,textarea:focus{background:#fff;border-color:var(--gold);box-shadow:0 0 0 4px rgba(212,175,55,.12);outline:none}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .result{background:var(--blue);color:#fff;padding:22px;border-radius:14px;margin-top:20px;text-align:center;display:none}
+
+    .form-wrap,.calling{background:#f8fafc;min-height:100vh;padding:50px 5%}
+    .msg{text-align:center;margin-top:16px;font-size:14px;font-weight:600;min-height:22px}
+    .ok{color:var(--green)}.err{color:var(--red)}
+
+    .dashboard{background:var(--bg);color:#fff;min-height:100vh;padding:28px}
+    .dash-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:28px}
+    .dash-head h1{color:var(--gold);font-size:30px;font-weight:900}
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;margin-bottom:28px}
+    .kpi-card{background:var(--card);border:1px solid rgba(212,175,55,.15);border-radius:18px;padding:20px}
+    .kpi{font-size:32px;font-weight:900;color:var(--gold)}
+    .kpi-label{color:var(--muted);font-size:12px;margin-top:6px;text-transform:uppercase;letter-spacing:.5px}
+    .table-box{background:var(--card);border-radius:18px;padding:20px;overflow-x:auto;border:1px solid rgba(255,255,255,.03)}
+    table{width:100%;border-collapse:collapse;color:#fff}
+    th{background:rgba(255,255,255,.02);color:var(--gold);text-transform:uppercase;letter-spacing:.5px;font-weight:700;text-align:left;padding:14px;font-size:11px;white-space:nowrap}
+    td{padding:14px;border-top:1px solid rgba(255,255,255,.05);font-size:13px;font-weight:600;white-space:nowrap}
+
+    .card-page{background:radial-gradient(circle at center,#0d2750,var(--bg));min-height:100vh;padding:40px 20px;display:flex;align-items:center;justify-content:center}
+    .business-card{width:380px;max-width:100%;background:rgba(255,255,255,.02);border:1px solid rgba(212,175,55,.25);backdrop-filter:blur(16px);border-radius:26px;padding:36px 28px;text-align:center;color:#fff}
+    .avatar{width:100px;height:100px;border-radius:50%;border:3px solid var(--gold);margin-bottom:16px;object-fit:cover}
+    .business-card h1{color:var(--gold);font-size:26px;margin-bottom:6px;font-weight:800}
+    .card-link{display:block;background:rgba(255,255,255,.04);border:1px solid rgba(212,175,55,.15);color:#fff;padding:13px;border-radius:12px;margin:10px 0;font-weight:700;transition:all .2s}
+    .card-link:hover{background:var(--gold);color:#000;border-color:var(--gold)}
+
+    .identity-shell{width:min(1120px,100%);margin:auto;color:#fff}
+    .identity-toolbar{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .identity-eyebrow{font:700 11px 'Inter',sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#8fa3bd}
+    .identity-title{font:900 clamp(28px,5vw,44px) 'Outfit',sans-serif;letter-spacing:-.04em;margin-top:4px}
+    .identity-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .identity-action{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+    .identity-action:hover{border-color:var(--role-accent,#c9a84c);color:var(--role-accent,#c9a84c)}
+    .identity-card{--role-accent:#c9a84c;position:relative;min-height:430px;overflow:hidden;border-radius:30px;background:#071a34;border:1px solid rgba(255,255,255,.09);box-shadow:0 30px 80px rgba(0,0,0,.38);padding:clamp(26px,5vw,54px);display:grid;grid-template-columns:1.2fr .8fr;gap:32px}
+    .identity-card::before,.identity-card::after{content:'';position:absolute;border-radius:50%;pointer-events:none}
+    .identity-card::before{width:440px;height:440px;right:-165px;bottom:-245px;border:70px solid color-mix(in srgb,var(--role-accent) 14%,transparent)}
+    .identity-card::after{width:520px;height:520px;right:-205px;bottom:-285px;border:1px solid color-mix(in srgb,var(--role-accent) 50%,transparent)}
+    .identity-stripe{position:absolute;inset:auto 0 0;height:7px;background:linear-gradient(90deg,var(--role-accent),#f97316,var(--role-accent))}
+    .identity-main{position:relative;z-index:2;display:flex;flex-direction:column;justify-content:space-between}
+    .identity-name{font:900 clamp(32px,5vw,54px) 'Outfit',sans-serif;letter-spacing:-.04em;line-height:1}
+    .identity-role{font:800 clamp(17px,2.5vw,23px) 'Outfit',sans-serif;color:var(--role-accent);margin-top:10px}
+    .identity-dept{margin-top:8px;color:#a8b7ca;font-size:13px;text-transform:uppercase;letter-spacing:.12em}
+    .identity-contact{display:grid;gap:14px;margin-top:42px}
+    .identity-contact a,.identity-contact div{display:flex;align-items:center;gap:12px;color:#eef4fb;font-weight:650}
+    .identity-contact-mark{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--role-accent) 18%,transparent);color:var(--role-accent);flex:none}
+    .identity-side{position:relative;z-index:2;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;text-align:right}
+    .identity-brand{font:900 19px 'Outfit',sans-serif;letter-spacing:.02em}
+    .identity-tagline{font:800 10px 'Inter',sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--role-accent);max-width:180px;line-height:1.6;margin-top:10px}
+    .identity-links{display:grid;gap:10px;width:min(230px,100%)}
+    .identity-link{display:block;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-weight:800;text-align:center}
+    .identity-link.primary{background:var(--role-accent);border-color:var(--role-accent);color:#071a34}
+    .identity-help{margin-top:18px;color:#8fa3bd;font-size:12px;text-align:center}
+
+    .bulbhul-btn{position:fixed;right:22px;bottom:22px;width:60px;height:60px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:26px;z-index:100;cursor:pointer;box-shadow:0 8px 24px rgba(212,175,55,.3);transition:all .3s}
+    .bulbhul-btn:hover{transform:scale(1.08)}
+    .chat{display:none;position:fixed;right:22px;bottom:96px;width:360px;max-width:calc(100vw - 28px);height:500px;background:#fff;border-radius:22px;z-index:99;overflow:hidden;box-shadow:0 18px 45px rgba(0,0,0,.15);border:1px solid var(--line)}
+    .chat-head{background:var(--blue);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;font-weight:800}
+    .chat-body{height:370px;overflow-y:auto;background:#f8fafc;padding:18px}
+    .bubble{padding:11px 14px;border-radius:14px;margin:9px 0;font-size:13px;line-height:1.5;max-width:85%;word-wrap:break-word}
+    .bot{background:#fff;color:#0a1628;border:1px solid var(--line)}
+    .user{background:var(--blue);color:#fff;margin-left:auto}
+    .chat-input{height:68px;display:flex;gap:8px;align-items:center;padding:14px 16px;border-top:1px solid var(--line);background:#fff}
+    .chat-input input{flex:1;margin:0;border-radius:22px;background:#f1f5f9;border-color:transparent;padding:11px 16px}
+
+    .bank-chip{display:flex;align-items:center;gap:8px;border:1.5px solid #cbd5e1;border-radius:11px;padding:11px 14px;background:#fff;cursor:pointer;transition:all .2s;user-select:none}
+    .bank-chip.selected{border-color:var(--gold);background:rgba(212,175,55,.06)}
+
+    .footer{background:var(--blue);color:#fff;text-align:center;padding:50px 5%}
+
+    @media(max-width:780px){
+      .hero{grid-template-columns:1fr;padding:40px 5%}
+      .hero h1{font-size:30px}
+      .header{flex-wrap:wrap;padding:12px 4%}
+      .header>.btn{display:none}
+      .nav{display:flex;width:100%;order:3;gap:20px;overflow-x:auto;padding-top:10px;white-space:nowrap}
+      .nav::-webkit-scrollbar{display:none}
+      .grid-2{grid-template-columns:1fr}
+      .logo{font-size:18px}
+      .box,.form-box,.calling-box{padding:24px 18px}
+      .dashboard{padding:16px}
+      .dash-head h1{font-size:22px}
+      .chat{width:calc(100vw - 20px);right:10px}
+      .section{padding:45px 5%}
+      .title{font-size:26px}
+      .card-page{padding:24px 14px;align-items:flex-start}
+      .identity-toolbar{align-items:flex-start;flex-direction:column}
+      .identity-card{grid-template-columns:1fr;min-height:620px;border-radius:22px}
+      .identity-side{align-items:flex-start;text-align:left}
+      .identity-links{width:100%}
+    }
+
+    @media print{
+      body{background:#fff}
+      body>*:not(#app){display:none!important}
+      .identity-toolbar,.identity-help{display:none!important}
+      .card-page{padding:0;background:#fff;min-height:auto}
+      .identity-card{box-shadow:none;width:100%;min-height:430px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    }
+  </style>
+</head>
+<body>
+  <script id="BOOT_DATA" type="application/json">__P1_BOOT_DATA_JSON__</script>
+  <div id="app"></div>
+
+  <div class="bulbhul-btn" id="bulbhulBtn" onclick="toggleChat()" title="Divyanshi Assistant">💬</div>
+  <div class="chat" id="chat">
+    <div class="chat-head">
+      <span>Divyanshi Assistant</span>
+      <span onclick="toggleChat()" style="cursor:pointer;font-size:20px">✕</span>
+    </div>
+    <div class="chat-body" id="chatBody">
+      <div class="bubble bot">Namaste! Main Divyanshi Assistant hoon. Loan, documents, eligibility ya case status ke liye message karein.</div>
+    </div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="Type message..." onkeypress="if(event.key==='Enter')sendBulbhul()">
+      <button class="btn" style="padding:10px 14px;border-radius:50%" onclick="sendBulbhul()">➤</button>
+    </div>
+  </div>
+
+  <script>
+    let BOOT = {};
+    try {
+      const raw = document.getElementById('BOOT_DATA').textContent.trim();
+      if (raw && raw !== '__P1_BOOT_DATA_JSON__') BOOT = JSON.parse(raw);
+    } catch(e) {}
+
+    const qs = new URLSearchParams(location.search);
+    const PAGE = String(BOOT.page || qs.get('page') || 'home').toLowerCase();
+    const EMP = String(BOOT.emp || qs.get('emp') || qs.get('emp_code') || '').toUpperCase();
+    try{const launchToken=qs.get('access_token');if(launchToken){sessionStorage.setItem('p1_access_'+EMP,launchToken);history.replaceState({},document.title,location.pathname+'?page='+encodeURIComponent(PAGE)+'&emp='+encodeURIComponent(EMP));}}catch(_){ }
+    const PRODUCT = String(BOOT.product || qs.get('product') || '').toUpperCase();
+    const EMP_ENC = encodeURIComponent(EMP);
+    const GATED_PAGES = ['dashboard','calling','voice'];
+    const BASE_URL = BOOT.baseUrl || location.href.split('?')[0];
+
+    const PRODUCTS = Array.isArray(BOOT.products) ? BOOT.products : [];
+
+    const STAFF_DATA = BOOT.staff || null;
+    const DASHBOARD_DATA = BOOT.dashboard || null;
+    const BANK_MAP = BOOT.banks || {};
+    const MOBILE_RE = /^[6-9]\d{9}$/;
+
+    function hasBackend(){return !!(window.google && google.script && google.script.run)}
+    function app(html){document.getElementById('app').innerHTML=html}
+    function base(){return String(BOOT.baseUrl||BASE_URL||'').trim()||location.href.split('?')[0]}
+    function money(n){const num=Number(n);return Number.isFinite(num)?num.toLocaleString('en-IN'):'0'}
+    function safe(s){return String(s == null ? '' : s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+    function routeUrl(page,extra){
+      const targetBase=base();
+      let url=targetBase+'?page='+encodeURIComponent(page||'home');
+      if(EMP&&EMP!=='EMP_CODE') url+='&emp='+EMP_ENC;
+      if(extra) Object.keys(extra).forEach(k=>{if(extra[k]!==undefined&&extra[k]!=='') url+='&'+encodeURIComponent(k)+'='+encodeURIComponent(extra[k])});
+      return url;
+    }
+    function go(p){
+      const val=String(p||'');
+      const url=val.charAt(0)==='?'?base()+val:routeUrl(val||'home');
+      window.top.location.href=url;
+    }
+
+    function layoutHeader(){
+      const isActive = (p) => PAGE===p ? 'active' : '';
+      return `
+        <div class="topbar">
+          <div>📞 +91-9899032117 | 011-45561492 | ✉️ support@divyanshicapital.com</div>
+          <div>Divyanshi Capital | Digital Services</div>
+        </div>
+        ${EMP?`<div class="staff-banner">👤 Staff Link Active: ${safe(EMP)}</div>`:''}
+        <div class="header">
+          <a class="logo" href="${routeUrl('home')}" aria-label="Divyanshi Capital home"><img src="https://www.divyanshicapital.com/wp-content/uploads/2021/09/logo1.png" alt="Divyanshi Capital" referrerpolicy="no-referrer"></a>
+          <nav class="nav">
+            <a href="${routeUrl('home')}" class="${isActive('home')}">Home</a>
+            <a href="${routeUrl('form')}" class="${isActive('form')}">Apply</a>
+            <a href="${routeUrl('card')}" class="${isActive('card')}">Card</a>
+            <a href="${routeUrl('dashboard')}" class="${isActive('dashboard')}">Dashboard</a>
+            <a href="${routeUrl('calling')}" class="${isActive('calling')}">Calling</a>
+          </nav>
+          <a class="btn" href="${routeUrl('form')}">Apply Now</a>
+        </div>`;
+    }
+
+    function renderHome(){
+      app(`
+        ${layoutHeader()}
+        <div class="hero">
+          <div>
+            <h1>Smart Loan Support for Every Financial Need</h1>
+            <p>Divyanshi Capital helps clients with Personal Loan, Business Loan, Home Loan, LAP and Auto Loan. Divyanshi Assistant guides documents, eligibility and next steps.</p>
+            <a class="btn" href="${routeUrl('form')}">Get Free Consultation</a>
+            <a class="btn orange" style="margin-left:10px" href="#calculator">Check EMI</a>
+          </div>
+          <div class="hero-card">
+            <h3>Why Divyanshi Capital?</h3>
+            <ul>
+              <li>✅ Bank and NBFC fitment guidance</li>
+              <li>✅ Product-wise document checklist</li>
+              <li>✅ Staff-wise digital lead link</li>
+              <li>✅ Divyanshi Assistant support</li>
+              <li>✅ Fast follow-up and case tracking</li>
+            </ul>
+          </div>
+        </div>
+        <div class="section" id="loans">
+          <h2 class="title">Loan Products</h2>
+          <div class="grid">
+            ${PRODUCTS.map(p=>`<div class="loan-card" onclick="go('?page=form&emp=${EMP_ENC}&product=${encodeURIComponent(p.code||'')}')">
+              <div class="icon">${p.icon||'💼'}</div>
+              <h3>${safe(p.name)}</h3>
+              <p>TAT: ${p.tat||7} Days | ROI ~ ${p.roi||10.5}%</p>
+            </div>`).join('')}
+          </div>
+        </div>
+        <div class="calculator" id="calculator">
+          <h2 class="title">Pre-Eligibility Calculator</h2>
+          <div class="box">
+            <select id="calcLoanType">${PRODUCTS.map(p=>`<option value="${safe(p.code)}">${safe(p.name)}</option>`).join('')}</select>
+            <input id="calcIncome" type="number" placeholder="Monthly Income ₹">
+            <input id="calcAmount" type="number" placeholder="Required Loan Amount ₹">
+            <input id="calcTenure" type="number" placeholder="Tenure (Years)">
+            <button class="btn" style="width:100%;margin-top:10px" onclick="calcEMI()">Check Eligibility</button>
+            <div class="result" id="calcResult">
+              <h3 id="calcEmiDisplay">EMI: ₹0</h3>
+              <p id="calcEligDisplay"></p>
+              <br>
+              <button class="btn" onclick="go('?page=form&emp=${EMP_ENC}&product='+encodeURIComponent(document.getElementById('calcLoanType').value))">Apply Now</button>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <h2 class="title">Digital Suite</h2>
+          <div class="grid">
+            <div class="feature-card"><h3>Smart Form</h3><p>Lead routes directly to CRM with staff mapping.</p></div>
+            <div class="feature-card"><h3>Digital Card</h3><p>Every staff can share their business card and lead link.</p></div>
+            <div class="feature-card"><h3>Dashboard</h3><p>Staff and management view cases and progress in real time.</p></div>
+            <div class="feature-card"><h3>Divyanshi Assistant</h3><p>Client and staff assistant for documents, eligibility and case status.</p></div>
+          </div>
+        </div>
+        <div class="footer">
+          <h2 style="font-size:26px;margin-bottom:18px">Need a professional loan consultation?</h2>
+          <a class="btn" href="${routeUrl('form')}">Contact Us Online</a>
+        </div>
+      `);
+    }
+
+    function renderForm(){
+      const staffBanner = (STAFF_DATA && STAFF_DATA.ok) ? `
+        <div style="display:flex;align-items:center;gap:12px;background:#fef9e7;border:1px solid rgba(212,175,55,.3);border-radius:14px;padding:12px 16px;margin-bottom:16px">
+          <img src="${safe(STAFF_DATA.profilePic)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--gold)">
+          <div style="font-size:13px"><strong style="color:var(--blue)">${safe(STAFF_DATA.name)}</strong><br><span style="color:#64748b">You are applying through their referral link</span></div>
+        </div>` : '';
+
+      app(`
+        ${layoutHeader()}
+        <div class="form-wrap">
+          <div class="form-box">
+            ${staffBanner}
+            <h2 style="color:var(--blue);text-align:center;margin-bottom:6px">Loan Application Form</h2>
+            <p style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:18px">Submit your details. Our team will connect shortly.</p>
+            <form id="leadForm" novalidate>
+              <input type="hidden" name="emp_code" value="${safe(EMP)}">
+              <input type="hidden" name="source_name" value="P1_SMART_DUNIYA">
+              <input name="client_name" placeholder="Full Name *" required>
+              <input name="client_mobile" placeholder="Mobile Number *" required pattern="[6-9][0-9]{9}" maxlength="10" inputmode="numeric">
+              <input name="client_email" placeholder="Email Address" type="email">
+              <div class="grid-2">
+                <input name="city_location" placeholder="City">
+                <input name="required_loan_amount" placeholder="Required Amount ₹ *" type="number" required>
+              </div>
+              <select name="loan_type" required onchange="renderBankOptions()" id="loanTypeSelect">
+                <option value="">Select Loan Type *</option>
+                ${PRODUCTS.map(p=>`<option value="${safe(p.name)}" ${PRODUCT===p.code?'selected':''}>${safe(p.name)}</option>`).join('')}
+              </select>
+              <select name="employment_type">
+                <option value="">Employment Type</option>
+                <option>SALARIED</option><option>SELF_EMPLOYED</option><option>BUSINESS</option><option>PROFESSIONAL</option>
+              </select>
+              <input type="hidden" name="preferred_bank" id="preferredBank">
+              <div id="bankBox" style="margin:8px 0">
+                <div style="font-weight:800;color:var(--blue);margin:12px 0 8px 0">Preferred Bank</div>
+                <div id="bankOptions" class="grid-2"></div>
+              </div>
+              <input name="company_name" placeholder="Company / Business Name">
+              <textarea name="remarks" rows="3" placeholder="Additional Details (optional)"></textarea>
+              <div style="margin:8px 0">
+                <div style="font-weight:800;color:var(--blue);margin:12px 0 6px 0">Upload Documents (optional)</div>
+                <input type="file" id="docFiles" multiple accept=".pdf,.jpg,.jpeg,.png">
+                <p style="font-size:11px;color:var(--muted);margin-top:4px">PDF or images, max 5 files, 5 MB each</p>
+                <div id="fileList" style="font-size:12px;color:#334155;margin-top:6px"></div>
+              </div>
+              <button class="btn orange" id="submitBtn" style="width:100%;margin-top:10px" type="submit">Submit Application</button>
+            </form>
+            <div id="formMsg" class="msg"></div>
+          </div>
+        </div>
+      `);
+      bindForm();
+      renderBankOptions();
+      const fileInput=document.getElementById('docFiles');
+      if(fileInput){
+        fileInput.addEventListener('change',function(){
+          const files=Array.from(fileInput.files||[]);
+          document.getElementById('fileList').innerHTML=files.length?files.map(f=>'📎 '+safe(f.name)+' ('+(f.size/1024).toFixed(0)+' KB)').join('<br>'):'';
+        });
+      }
+    }
+
+    function roleAccent(role){
+      const value=String(role||'').toUpperCase();
+      if(value.includes('MD')||value.includes('FOUNDER')||value.includes('DIRECTOR')) return '#d6ad45';
+      if(value.includes('SALES')) return '#f59e0b';
+      if(value.includes('COORDINATOR')||value.includes('LOGIN')) return '#38bdf8';
+      if(value.includes('HR')) return '#f472b6';
+      if(value.includes('ACCOUNT')) return '#34d399';
+      return '#d6ad45';
+    }
+
+    function downloadStaffVCard(){
+      const s=STAFF_DATA;
+      if(!s||!s.ok) return;
+      const clean=v=>String(v||'').replace(/[\n\r]+/g,' ').replace(/([,;])/g,'\\$1');
+      const phone=String(s.mobile||'').replace(/\D/g,'');
+      const cardUrl=s.cardLink||routeUrl('card');
+      const vcard=[
+        'BEGIN:VCARD','VERSION:3.0',
+        'FN:'+clean(s.name),
+        'ORG:Divyanshi Capital Pvt Ltd',
+        'TITLE:'+clean(s.designation||s.role),
+        phone?'TEL;TYPE=CELL:+91'+phone.slice(-10):'',
+        s.email?'EMAIL;TYPE=WORK:'+clean(s.email):'',
+        'URL:'+clean(cardUrl),
+        'END:VCARD'
+      ].filter(Boolean).join('\r\n');
+      const link=document.createElement('a');
+      link.href=URL.createObjectURL(new Blob([vcard],{type:'text/vcard;charset=utf-8'}));
+      link.download=(String(s.name||s.empCode||'staff').replace(/[^a-z0-9]+/gi,'-')+'.vcf');
+      document.body.appendChild(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(link.href),500);
+    }
+
+    function renderCard(){
+      const s=STAFF_DATA;
+      if(!s||!s.ok){
+        const local=location.protocol==='file:';
+        app(`${layoutHeader()}
+          <div style="padding:64px 20px;text-align:center;max-width:680px;margin:auto">
+            <div style="font-size:44px;margin-bottom:12px">🪪</div>
+            <h2 style="color:var(--blue);font-size:30px">Staff card needs a live employee record</h2>
+            <p style="color:var(--muted);line-height:1.7;margin-top:10px">${local?'This local file cannot read ALL_EMPLOYEES. Open the deployed Apps Script URL':'Add a valid employee code to the card URL'} using <strong>?page=card&amp;emp=DC002</strong>.</p>
+          </div>`);
+        return;
+      }
+      const designation=s.designation||s.role||'Financial Consultant';
+      const department=s.department||s.dept||'';
+      const phone=String(s.mobile||'').replace(/\D/g,'').slice(-10);
+      const whatsapp=String(s.whatsapp||phone).replace(/\D/g,'').slice(-10);
+      const accent=roleAccent(designation);
+      const address=s.address||'B-1/637, 3rd Floor, Near Janakpuri East Metro Station, Janakpuri, New Delhi - 110058';
+      app(`
+        <div class="card-page">
+          <div class="identity-shell" style="--role-accent:${accent}">
+            <div class="identity-toolbar">
+              <div><div class="identity-eyebrow">Verified staff profile · ${safe(s.empCode||EMP)}</div><h1 class="identity-title">Digital Identity</h1></div>
+              <div class="identity-actions">
+                <button class="identity-action" onclick="downloadStaffVCard()">Download contact</button>
+                <button class="identity-action" onclick="window.print()">Print card</button>
+              </div>
+            </div>
+            <article class="identity-card">
+              <div class="identity-main">
+                <div>
+                  <h2 class="identity-name">${safe(s.name||s.empCode)}</h2>
+                  <div class="identity-role">${safe(designation)}</div>
+                  ${department?`<div class="identity-dept">${safe(department)}</div>`:''}
+                </div>
+                <div class="identity-contact">
+                  ${phone?`<a href="tel:+91${safe(phone)}"><span class="identity-contact-mark">☎</span><span>+91 ${safe(phone.slice(0,5))} ${safe(phone.slice(5))}</span></a>`:''}
+                  ${s.email?`<a href="mailto:${safe(s.email)}"><span class="identity-contact-mark">✉</span><span>${safe(s.email)}</span></a>`:''}
+                  <div><span class="identity-contact-mark">⌖</span><span>${safe(address)}</span></div>
+                </div>
+              </div>
+              <aside class="identity-side">
+                <div><img class="identity-logo" src="https://www.divyanshicapital.com/wp-content/uploads/2021/09/logo1.png" alt="Divyanshi Capital" referrerpolicy="no-referrer"><div class="identity-tagline">India's trusted loan facilitation network</div></div>
+                <div class="identity-links">
+                  ${whatsapp?`<a class="identity-link" href="https://wa.me/91${safe(whatsapp)}" target="_blank" rel="noopener">WhatsApp ${safe(s.name||'staff')}</a>`:''}
+                  <a class="identity-link primary" href="${safe(s.formLink||routeUrl('form'))}">Apply through this staff member</a>
+                </div>
+              </aside>
+              <div class="identity-stripe"></div>
+            </article>
+            <p class="identity-help">Profile details are controlled by ALL_EMPLOYEES. Loan products and policies are controlled by Loan_Bank_Map.</p>
+          </div>
+        </div>
+      `);
+    }
+
+    function renderDashboard(){
+      if(!DASHBOARD_DATA||!DASHBOARD_DATA.ok){app(`${layoutHeader()}<div class="form-wrap" style="padding:60px 20px;text-align:center"><h2 style="color:var(--blue)">Dashboard unavailable</h2><p style="color:var(--muted);margin:12px 0 20px">${safe((DASHBOARD_DATA&&DASHBOARD_DATA.err)||'Verify your employee session and try again.')}</p><button class="btn" onclick="location.reload()">Retry</button></div>`);return;}
+      const d=DASHBOARD_DATA;
+      const control=d.control&&d.control.ok?d.control:null;
+      const controlPanel=control?`
+        <div class="table-box" style="margin-bottom:20px">
+          <h3 style="color:var(--gold);margin-bottom:14px">System & Avatar Control · ${safe(control.scope||'SELF')}</h3>
+          <div class="kpi-grid" style="margin-bottom:18px">
+            <div class="kpi-card"><div class="kpi">${(control.summary&&control.summary.employees)||0}</div><div class="kpi-label">Visible Staff</div></div>
+            <div class="kpi-card"><div class="kpi">${(control.summary&&control.summary.openCases)||0}</div><div class="kpi-label">Open Cases</div></div>
+            <div class="kpi-card"><div class="kpi" style="color:var(--orange)">${(control.summary&&control.summary.tatBreaches)||0}</div><div class="kpi-label">TAT Breaches</div></div>
+            <div class="kpi-card"><div class="kpi">${(control.summary&&control.summary.processIssues)||0}</div><div class="kpi-label">Process Issues</div></div>
+          </div>
+          <table><thead><tr><th>Employee</th><th>Role</th><th>Avatar</th><th>Today</th><th>Target</th><th>Assigned</th><th>Open</th><th>Completed</th><th>Performance</th><th>TAT</th><th>Next Action</th></tr></thead><tbody>
+          ${((control.avatars||[]).map(a=>`<tr><td>${safe(a.EMP_CODE||'')} · ${safe(a.EMPLOYEE_NAME||'')}</td><td>${safe(a.ROLE||'')}</td><td>${safe(a.AVATAR_STATUS||'')}</td><td>${safe(a.TODAY_ACTIVITY||'')}</td><td>${safe(a.TARGET||0)}</td><td>${safe(a.ASSIGNED_CASES||0)}</td><td>${safe(a.OPEN_CASES||0)}</td><td>${safe(a.COMPLETED_CASES||0)}</td><td>${safe(a.PERFORMANCE_PCT||0)}%</td><td>${safe(a.TAT_BREACHES||0)}</td><td>${safe(a.NEXT_ACTION||'')}</td></tr>`).join(''))||'<tr><td colspan="11">No visible avatar records</td></tr>'}
+          </tbody></table>
+          ${(control.processes||[]).some(p=>p.STATUS!=='OK'&&p.STATUS!=='ACTIVE')?`<div style="margin-top:16px"><strong style="color:var(--orange)">Process attention</strong>${(control.processes||[]).filter(p=>p.STATUS!=='OK'&&p.STATUS!=='ACTIVE').map(p=>`<div style="padding:6px 0;color:var(--muted)">${safe(p.PROCESS)} · ${safe(p.STATUS)} · ${safe(p.NEXT_ACTION||'Review')}</div>`).join('')}</div>`:''}
+        </div>`:'';
+      app(`
+        <div class="dashboard">
+          <div class="dash-head">
+            <div>
+              <h1>Welcome, ${safe((d.staff&&d.staff.NAME)||'Team')}</h1>
+              <p style="color:#94A3B8">${safe((d.staff&&d.staff.DESIGNATION)||'')} | ${safe((d.staff&&d.staff.DEPARTMENT)||'')}</p>
+            </div>
+            <a class="btn" href="${routeUrl('home')}">← Home</a>
+          </div>
+          <div class="kpi-grid">
+            <div class="kpi-card"><div class="kpi">${(d.stats&&d.stats.total)||0}</div><div class="kpi-label">Total Leads</div></div>
+            <div class="kpi-card"><div class="kpi">${(d.stats&&d.stats.approved)||0}</div><div class="kpi-label">Approved</div></div>
+            <div class="kpi-card"><div class="kpi" style="color:var(--orange)">${(d.stats&&d.stats.review)||0}</div><div class="kpi-label">Pending</div></div>
+            <div class="kpi-card"><div class="kpi">₹${(((d.stats&&d.stats.volume)||0)/100000).toFixed(1)}L</div><div class="kpi-label">Volume</div></div>
+          </div>
+          ${controlPanel}
+          <div class="table-box">
+            <h3 style="color:var(--gold);margin-bottom:14px">Recent Cases</h3>
+            <table>
+              <thead><tr><th>Lead ID</th><th>Client</th><th>Mobile</th><th>Loan</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody>
+                ${((d.cases||[]).map(c=>{
+                  const m=safe(c.mobile||'');
+                  return `<tr>
+                    <td>${safe(c.leadId||'')}</td>
+                    <td>${safe(c.clientName||'')}</td>
+                    <td>${m}</td>
+                    <td>${safe(c.loanType||'')}</td>
+                    <td>₹${money(c.amount||0)}</td>
+                    <td>${safe(c.status||'OPEN')}</td>
+                    <td><button class="btn orange" style="padding:6px 10px" onclick="window.top.location.href='tel:${m}'">Call</button></td>
+                  </tr>`;
+                }).join(''))||`<tr><td colspan="7" style="text-align:center;padding:24px">No cases found</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `);
+    }
+
+    function renderCalling(){
+      app(`
+        ${layoutHeader()}
+        <div class="calling">
+          <div class="calling-box">
+            <h2 style="color:var(--blue);text-align:center;margin-bottom:16px">Mini Calling Desk</h2>
+            <input id="callMobile" placeholder="Client Mobile Number" inputmode="numeric" maxlength="10">
+            <select id="callStatus">
+              <option value="">Select Call Status</option>
+              <option>INTERESTED</option><option>CALLBACK</option><option>NOT_INTERESTED</option>
+              <option>DOCUMENTS_PENDING</option><option>LOGIN_DONE</option>
+            </select>
+            <textarea id="callRemarks" rows="3" placeholder="Call notes and remarks"></textarea>
+            <button class="btn orange" id="callBtn" style="width:100%" onclick="logCall()">Log Call and Update</button>
+            <div id="callMsg" class="msg"></div>
+          </div>
+        </div>
+      `);
+    }
+
+    function calcEMI(){
+      const amount=Number(document.getElementById('calcAmount').value||0);
+      const income=Number(document.getElementById('calcIncome').value||0);
+      const years=Number(document.getElementById('calcTenure').value||0);
+      const code=document.getElementById('calcLoanType').value;
+      if(!amount||!income||!years){alert('Please fill income, amount and tenure');return}
+      const product=PRODUCTS.find(x=>x.code===code)||PRODUCTS[0];
+      if(!product){alert('No active loan products configured in Loan_Bank_Map');return}
+      const months=years*12;
+      const rate=(Number(product.roi)||10.5)/12/100;
+      const emi=(amount*rate*Math.pow(1+rate,months))/(Math.pow(1+rate,months)-1);
+      const eligible=emi<income*0.5;
+      document.getElementById('calcEmiDisplay').innerText='EMI: ₹'+money(Math.round(emi));
+      document.getElementById('calcEligDisplay').innerText=eligible?'✅ Profile looks workable. You can apply now.':'⚠ EMI is high relative to income.';
+      document.getElementById('calcResult').style.display='block';
+    }
+
+    function renderBankOptions(){
+      const loanSelect=document.getElementById('loanTypeSelect');
+      const optionsBox=document.getElementById('bankOptions');
+      const hiddenInput=document.getElementById('preferredBank');
+      if(!loanSelect||!optionsBox||!hiddenInput) return;
+      const loanKey=String(loanSelect.value||'').toUpperCase();
+      const banks=BANK_MAP[loanKey]||[];
+      if(!banks.length){
+        hiddenInput.value='';
+        optionsBox.innerHTML='<div style="grid-column:1/-1;color:var(--muted);font-size:13px">No active banks configured for this loan type in Loan_Bank_Map.</div>';
+        return;
+      }
+      optionsBox.innerHTML=banks.map(b=>`<div class="bank-chip" onclick="toggleBankChip(this)"><input type="checkbox" value="${safe(b)}" style="display:none"><span>${safe(b)}</span></div>`).join('');
+      syncSelectedBanks();
+    }
+    function toggleBankChip(el){
+      const cb=el.querySelector('input[type="checkbox"]');
+      if(!cb) return;
+      cb.checked=!cb.checked;
+      cb.checked?el.classList.add('selected'):el.classList.remove('selected');
+      syncSelectedBanks();
+    }
+    function syncSelectedBanks(){
+      const hidden=document.getElementById('preferredBank');
+      const selected=Array.from(document.querySelectorAll('.bank-chip input:checked')).map(x=>x.value);
+      if(hidden) hidden.value=selected.join(',');
+    }
+
+    function fileToBase64_(file){
+      return new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onload=()=>resolve(reader.result);
+        reader.onerror=()=>reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function bindForm(){
+      const form=document.getElementById('leadForm');
+      if(!form) return;
+      form.onsubmit=async function(e){
+        e.preventDefault();
+        const formData=Object.fromEntries(new FormData(form));
+        const msg=document.getElementById('formMsg');
+        const btn=document.getElementById('submitBtn');
+        if(!MOBILE_RE.test(String(formData.client_mobile||'').trim())){
+          msg.className='msg err';msg.innerText='❌ Please enter a valid 10-digit mobile number';return;
+        }
+        if(!hasBackend()){
+          msg.className='msg err';msg.innerText='❌ Backend not connected.';return;
+        }
+        const fileInput=document.getElementById('docFiles');
+        const rawFiles=fileInput?Array.from(fileInput.files||[]):[];
+        if(rawFiles.length>5){msg.className='msg err';msg.innerText='❌ Maximum 5 files allowed.';return}
+        if(rawFiles.find(f=>f.size>5*1024*1024)){msg.className='msg err';msg.innerText='❌ File exceeds 5 MB limit.';return}
+
+        btn.disabled=true;btn.innerText='Reading files...';msg.className='msg';msg.innerText='Please wait...';
+        let filesPayload=[];
+        try{
+          filesPayload=await Promise.all(rawFiles.map(async f=>{
+            const dataUrl=await fileToBase64_(f);
+            return {name:f.name,mimeType:f.type||'application/octet-stream',base64:dataUrl};
+          }));
+        }catch(err){
+          btn.disabled=false;btn.innerText='Submit Application';
+          msg.className='msg err';msg.innerText='❌ Could not read file(s)';return;
+        }
+        formData.files=filesPayload;
+        btn.innerText='Submitting...';
+
+        google.script.run
+          .withSuccessHandler(function(res){
+            btn.disabled=false;btn.innerText='Submit Application';
+            if(res&&(res.ok||res.success)){
+              renderThankYou(formData.client_name,res.leadId,res.tatDays,res.requiredDocuments||[],res.uploadedDocuments||0);
+            }else{
+              msg.className='msg err';msg.innerText='❌ '+(res&&(res.err||res.errorMessage)||'Submission failed');
+            }
+          })
+          .withFailureHandler(function(err){
+            btn.disabled=false;btn.innerText='Submit Application';
+            msg.className='msg err';msg.innerText='❌ '+(err.message||err);
+          })
+          .P1_SMART_FORM_SUBMIT(formData);
+      };
+    }
+
+    function renderThankYou(name,leadId,tatDays,docs,uploaded){
+      const docsHtml=(docs||[]).map(d=>`<li style="margin:6px 0">✓ ${safe(d)}</li>`).join('');
+      app(`
+        ${layoutHeader()}
+        <div class="form-wrap">
+          <div class="form-box" style="text-align:center">
+            <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--green),#059669);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:40px;color:#fff;font-weight:900">✓</div>
+            <h2 style="color:var(--blue);margin:18px 0 6px">Thank you${name?', '+safe(name):''}!</h2>
+            <p style="color:var(--muted);font-size:14px;margin-bottom:4px">Your application has been received.</p>
+            <p style="color:var(--blue);font-weight:800;font-size:15px;margin-bottom:12px">Lead ID: ${safe(leadId||'-')}</p>
+            <div style="background:#f1f5f9;border-radius:14px;padding:18px;text-align:left;margin-bottom:16px">
+              <div style="font-weight:800;color:var(--blue);margin-bottom:8px">⏱ Estimated TAT: ${safe(tatDays||'7')} working day(s)</div>
+              <div style="font-weight:800;color:var(--blue);margin-bottom:8px">📋 Documents Checklist:</div>
+              <ul style="list-style:none;padding:0;margin:0">${docsHtml}</ul>
+            </div>
+            <a class="btn" href="${routeUrl('form')}">Submit Another</a>
+            <a class="btn orange" style="margin-left:10px" href="${routeUrl('home')}">Back to Home</a>
+          </div>
+        </div>
+      `);
+    }
+
+    function logCall(){
+      const mobile=document.getElementById('callMobile').value.trim();
+      const msg=document.getElementById('callMsg');
+      const btn=document.getElementById('callBtn');
+      if(!MOBILE_RE.test(mobile)){msg.className='msg err';msg.innerText='❌ Valid 10-digit mobile required';return}
+      if(!hasBackend()){msg.className='msg err';msg.innerText='❌ Backend not connected.';return}
+      btn.disabled=true;msg.className='msg';msg.innerText='Saving...';
+      google.script.run
+        .withSuccessHandler(function(res){
+          btn.disabled=false;
+          if(res&&(res.ok||res.success)){msg.className='msg ok';msg.innerText='✅ Call logged successfully'}
+          else{msg.className='msg err';msg.innerText='❌ '+(res&&(res.err||res.errorMessage)||'Update failed')}
+        })
+        .withFailureHandler(function(err){
+          btn.disabled=false;msg.className='msg err';msg.innerText='❌ '+(err.message||err);
+        })
+        .MLA_UPDATE_MINI_STATUS({mobile:mobile,status:document.getElementById('callStatus').value,remarks:document.getElementById('callRemarks').value,agent:EMP});
+    }
+
+    function toggleChat(){
+      const chat=document.getElementById('chat');
+      if(!chat) return;
+      chat.style.display=chat.style.display==='block'?'none':'block';
+    }
+    function sendBulbhul(){
+      const input=document.getElementById('chatInput');
+      const body=document.getElementById('chatBody');
+      if(!input||!body) return;
+      const text=input.value.trim();
+      if(!text) return;
+      body.innerHTML+=`<div class="bubble user">${safe(text)}</div>`;
+      input.value='';
+      body.scrollTop=body.scrollHeight;
+      if(!hasBackend()){
+        body.innerHTML+=`<div class="bubble bot">Backend not connected.</div>`;
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(function(reply){
+          body.innerHTML+=`<div class="bubble bot">${safe(reply||'Divyanshi Assistant is ready.')}</div>`;
+          body.scrollTop=body.scrollHeight;
+        })
+        .withFailureHandler(function(err){
+          body.innerHTML+=`<div class="bubble bot">Error: ${safe(err.message||err)}</div>`;
+          body.scrollTop=body.scrollHeight;
+        })
+        .BULBHUL_CHAT_API({message:text,empCode:EMP,accessToken:(function(){try{return sessionStorage.getItem('p1_access_'+EMP)||''}catch(e){return''}})(),source:'INDEX'});
+    }
+
+    function isGateVerified(code){
+      if(PAGE==='calling'||PAGE==='voice')return false;
+      try{return sessionStorage.getItem('p1_verified_'+code)==='yes'}catch(e){return false}
+    }
+    function renderAccessGate(target){
+      app(`
+        ${layoutHeader()}
+        <div class="form-wrap" style="display:flex;align-items:center;justify-content:center;min-height:60vh">
+          <div class="form-box" style="text-align:center;max-width:380px">
+            <div style="font-size:44px;margin-bottom:6px">🔒</div>
+            <h2 style="color:var(--blue);margin-bottom:6px">Internal Team Access</h2>
+            <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Enter your Employee Code and PIN</p>
+            <input id="gateEmployeeCode" placeholder="Employee Code" value="${safe(EMP)}" style="text-transform:uppercase">
+            <input id="gatePinCode" placeholder="PIN" type="password" inputmode="numeric">
+            <button class="btn" id="gateVerifyBtn" style="width:100%;margin-top:10px" onclick="verifyGate('${target}')">Verify & Continue</button>
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:14px"><button class="btn-copy" type="button" onclick="forgotPin()">Forgot PIN</button><button class="btn-copy" type="button" onclick="changePin()">Change PIN</button></div>
+            <div id="gateMsg" class="msg"></div>
+          </div>
+        </div>
+      `);
+    }
+    function forgotPin(){
+      const emp=(document.getElementById('gateEmployeeCode').value||'').trim().toUpperCase(),email=window.prompt('Enter your registered company email:');if(!emp||!email)return;
+      if(!hasBackend())return;
+      google.script.run.withSuccessHandler(function(){const otp=window.prompt('If eligible, enter the verification code sent to your registered email:'),next=window.prompt('New PIN (6–12 digits):');if(!otp||!next)return;google.script.run.withSuccessHandler(function(v){if(!v||!v.ok){alert((v&&v.err)||'Verification failed');return;}google.script.run.withSuccessHandler(function(r){alert((r&&r.msg)||((r&&r.err)||'PIN reset failed'));}).P1_RESET_PIN(emp,v.resetToken,next);}).P1_VERIFY_OTP(emp,otp);}).withFailureHandler(()=>alert('Request could not be completed.')).P1_FORGOT_PIN(emp,email);
+    }
+    function changePin(){
+      const emp=(document.getElementById('gateEmployeeCode').value||'').trim().toUpperCase(),current=window.prompt('Current PIN:'),next=window.prompt('New PIN (6–12 digits):');if(!emp||!current||!next||!hasBackend())return;
+      google.script.run.withSuccessHandler(function(v){if(!v||!v.ok){alert((v&&v.err)||'Current PIN is invalid');return;}google.script.run.withSuccessHandler(function(r){alert((r&&r.msg)||((r&&r.err)||'PIN update failed'));}).P1_CHANGE_PIN(emp,v.accessToken,current,next);}).withFailureHandler(()=>alert('PIN update failed.')).P1_VERIFY_ACCESS(emp,current);
+    }
+    function verifyGate(target){
+      const emp=document.getElementById('gateEmployeeCode').value.trim().toUpperCase();
+      const pin=document.getElementById('gatePinCode').value.trim();
+      const btn=document.getElementById('gateVerifyBtn');
+      const msg=document.getElementById('gateMsg');
+      if(!emp){msg.className='msg err';msg.innerText='Employee Code required';return}
+      if(!hasBackend()){msg.className='msg err';msg.innerText='Backend not connected.';return}
+      btn.disabled=true;msg.className='msg';msg.innerText='Verifying...';
+      google.script.run
+        .withSuccessHandler(function(res){
+          btn.disabled=false;
+          if(res&&(res.ok||res.success)){
+            try{sessionStorage.setItem('p1_verified_'+emp,'yes');sessionStorage.setItem('p1_access_'+emp,res.accessToken||'')}catch(e){}
+            go('?page='+target+'&emp='+encodeURIComponent(emp)+(res.accessToken?'&access_token='+encodeURIComponent(res.accessToken):''));
+          }else{
+            msg.className='msg err';msg.innerText='❌ '+(res&&(res.err||res.errorMessage)||'Access denied');
+          }
+        })
+        .withFailureHandler(function(err){
+          btn.disabled=false;msg.className='msg err';msg.innerText='❌ '+(err.message||err);
+        })
+        .P1_VERIFY_ACCESS(emp,pin);
+    }
+
+    function renderApp(){
+      try{
+        if(!document.getElementById('app')) return;
+        if(GATED_PAGES.indexOf(PAGE)>-1 && (!isGateVerified(EMP)||(PAGE==='dashboard'&&!DASHBOARD_DATA))){
+          renderAccessGate(PAGE);return;
+        }
+        if(PAGE==='form'||PAGE==='smart'){window.top.location.href=routeUrl('form');return;}
+        else if(PAGE==='dashboard') renderDashboard();
+        else if(PAGE==='card') renderCard();
+        else if(PAGE==='calling'){window.top.location.href=routeUrl('calling');return;}
+        else renderHome();
+      }catch(err){
+        document.getElementById('app').innerHTML=`<div style="padding:40px"><h2 style="color:#dc2626">Page Error</h2><p>${safe(err.message||err)}</p></div>`;
+      }
+    }
+    renderApp();
+  </script>
+</body>
+</html>
