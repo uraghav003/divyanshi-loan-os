@@ -1784,7 +1784,7 @@ function DC_INSTALL_P1_FINAL_() {
   ['AVATAR_ACTIVITY_LOG','NOTIFY_QUEUE'].forEach(n=>{if(!ss.getSheetByName(n))ss.insertSheet(n);});
   SYNC_SOURCE_NAME_MASTER_();
   P1_CLIENT_DOCS_ROOT_();
-  const managed=['MIS_PIPELINE_RUN_','SYNC_MASTER_CONTROL_CENTER_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','HR_DAILY_ONBOARDING_FOLLOWUP_','P1_ROLE_DASHBOARD_DAILY_','onEdit','P1_ON_EDIT_INSTALLABLE','P1_FORM_SUBMIT'];
+  const managed=['MIS_PIPELINE_RUN_','SYNC_MASTER_CONTROL_CENTER_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','HR_DAILY_ONBOARDING_FOLLOWUP_','P1_ROLE_DASHBOARD_DAILY_','P1_MAP_HTML_LINKS_','onEdit','P1_ON_EDIT_INSTALLABLE','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
   ScriptApp.newTrigger('SYNC_MASTER_CONTROL_CENTER_').timeBased().everyHours(1).create();
@@ -1792,10 +1792,12 @@ function DC_INSTALL_P1_FINAL_() {
   ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
   ScriptApp.newTrigger('HR_DAILY_ONBOARDING_FOLLOWUP_').timeBased().atHour(10).everyDays(1).create();
   ScriptApp.newTrigger('P1_ROLE_DASHBOARD_DAILY_').timeBased().atHour(6).everyDays(1).create();
+  ScriptApp.newTrigger('P1_MAP_HTML_LINKS_').timeBased().atHour(5).everyDays(1).create();
   try{ScriptApp.newTrigger('P1_ON_EDIT_INSTALLABLE').forSpreadsheet(ss).onEdit().create();}catch(_){}
   try{ScriptApp.newTrigger('P1_FORM_SUBMIT').forSpreadsheet(ss).onFormSubmit().create();}catch(_){}
   P1_SET_TG_WEBHOOK_();
   SYNC_MASTER_CONTROL_CENTER_();
+  try{P1_MAP_HTML_LINKS_();}catch(e){LOG_ERR_('DC_INSTALL_P1_FINAL_','P1_MAP_HTML_LINKS_',e.message);}
   Logger.log('✅ DC_INSTALL_P1_FINAL_ complete');
   return'INSTALL_OK';
 }
