@@ -2117,11 +2117,11 @@ function technicalFixes() {
       ui.ButtonSet.YES_NO_CANCEL
     );
     if      (pick2 === ui.Button.YES)    { const r=P1_MAP_HTML_LINKS_();   ui.alert('Done', r, ui.ButtonSet.OK); }
-    else if (pick2 === ui.Button.NO)     { CLEAR_CACHE_NOW();              SpreadsheetApp.getActiveSpreadsheet().toast('Caches cleared','Divyanshi Assistant',3); }
+    else if (pick2 === ui.Button.NO)     { CLEAR_CACHE_NOW();              ui.toast('Caches cleared','Divyanshi Assistant',3); }
     else if (pick2 === ui.Button.CANCEL) { const r=HEALTH_CHECK_();        ui.alert('Health Check', r.pass+' PASS | '+r.fail+' FAIL', ui.ButtonSet.OK); }
   }
 
-  SpreadsheetApp.getActiveSpreadsheet().toast('Technical Fixes session complete', 'Divyanshi Assistant', 3);
+  ui.toast('Technical Fixes session complete', 'Divyanshi Assistant', 3);
 }
 
 function _techFix_ScriptProperties_(ui, props) {
@@ -2176,7 +2176,7 @@ function _techFix_ScriptProperties_(ui, props) {
   }
 
   INVALIDATE_ALL_CACHES_();
-  SpreadsheetApp.getActiveSpreadsheet().toast(`${updated} propert${updated===1?'y':'ies'} saved. Cache cleared.`, 'Divyanshi Assistant', 4);
+  ui.toast(`${updated} propert${updated===1?'y':'ies'} saved. Cache cleared.`, 'Divyanshi Assistant', 4);
 }
 
 /* ================================================================
