@@ -16,21 +16,17 @@ const DASHBOARD_CORE = {
 // ================== PUBLIC ENTRY POINTS ==================
 
 function BUILD_PERSONAL_ROLE_BASED_DASHBOARDS() {
-  SYNC_ROLE_DASHBOARDS_ENGINE();
+  // Main personal file sync (MY_CASES + SALES_ACTIVITY)
+  try {
+    MIS_15MIN_FULL_SYNC_();
+    Logger.log("✅ BUILD_PERSONAL_ROLE_BASED_DASHBOARDS completed");
+  } catch (e) {
+    LOG_ERR_("BUILD_PERSONAL_ROLE_BASED_DASHBOARDS", "", e.message);
+  }
 }
 
 function MARK_DASHBOARD_SYNC_PENDING() {
   PropertiesService.getScriptProperties().setProperty("DASHBOARD_SYNC_PENDING", "YES");
-}
-
-function SYNC_ROLE_DASHBOARDS_ENGINE() {
-  try {
-    // Main personal file sync (MY_CASES + SALES_ACTIVITY)
-    MIS_15MIN_FULL_SYNC_();
-    Logger.log("✅ SYNC_ROLE_DASHBOARDS_ENGINE completed");
-  } catch (e) {
-    LOG_ERR_("SYNC_ROLE_DASHBOARDS_ENGINE", "", e.message);
-  }
 }
 
 function DASHBOARD_SYNC_TRIGGER_ENGINE() {
@@ -40,7 +36,7 @@ function DASHBOARD_SYNC_TRIGGER_ENGINE() {
   const lock = LockService.getScriptLock();
   try {
     if (lock.tryLock(30000)) {
-      SYNC_ROLE_DASHBOARDS_ENGINE();
+      SYNC_ROLE_DASHBOARDS_AND_LOCK_ENGINE_();
       props.setProperty("DASHBOARD_SYNC_PENDING", "NO");
       Logger.log("✅ Dashboard sync completed");
     }
@@ -146,7 +142,7 @@ function LOCK_ALL_PERSONAL_DASHBOARDS_TO_CORE_ONLY(empData, E) {
 
 // ================== MAIN SYNC ENGINE ==================
 
-function SYNC_ROLE_DASHBOARDS_ENGINE() {
+function SYNC_ROLE_DASHBOARDS_AND_LOCK_ENGINE_() {
   const masterId = getMasterFileIdSafe_();
   const ss = SpreadsheetApp.openById(masterId);
 
