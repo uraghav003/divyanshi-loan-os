@@ -1668,7 +1668,65 @@ function P1_ON_EDIT_INSTALLABLE(e) {
         if(watched.some(k=>col===h.indexOf(k)+1))PROCESS_HR_APPROVAL_ROW_(sh,row);
       } catch(_){}
     }
+
+    // ALL_EMPLOYEES: smart auto-provision when 4 key fields filled
+    if(name==='ALL_EMPLOYEES'){
+      try { ALL_EMP_SMART_PROVISION_ON_EDIT_(sh,row,col); } catch(_){}
+    }
   } catch(err){ LOG_ERR_('P1_ON_EDIT_INSTALLABLE','',err.message); }
+}
+
+/* ── ALL_EMPLOYEES smart provision on edit ── */
+function ALL_EMP_SMART_PROVISION_ON_EDIT_(sh, row, col) {
+  const h = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
+  const idx = k => { const n=DC_NORM_(k); return h.indexOf(n); };
+  const iCode = idx('EMP_CODE');
+  if(iCode < 0) return;
+
+  const rowVals = sh.getRange(row,1,1,h.length).getValues()[0];
+  const get = k => { const i=idx(k); return i>-1?String(rowVals[i]||'').trim():''; };
+
+  const empCode = (get('EMP_CODE')).toUpperCase();
+  if(!empCode) return;
+
+  const empName = get('EMPLOYEES_NAME')||get('EMPLOYEE_NAME')||get('NAME');
+  const dept    = get('DEPARTMENT');
+  const email   = DC_CLEAN_EMAIL_(get('EMPLOYEE_EMAIL_ID')||get('EMPLOYEE_EMAIL'));
+  const fileId  = get('PERSONAL_FILE_ID');
+  const props   = PropertiesService.getScriptProperties();
+
+  // HR manually filled PERSONAL_FILE_ID → queue link mapping immediately
+  const iFile = idx('PERSONAL_FILE_ID');
+  if(iFile > -1 && col === iFile+1 && fileId.length > 15) {
+    props.setProperty('AUTO_PROVISION_PENDING_'+empCode, 'LINKS_ONLY');
+    MARK_DASHBOARD_SYNC_PENDING();
+    return;
+  }
+
+  // All 4 key fields present + PERSONAL_FILE_ID missing → queue full provision
+  if(empCode && empName && dept && email && (!fileId || fileId.length < 15)) {
+    props.setProperty('AUTO_PROVISION_PENDING_'+empCode, 'FULL');
+    MARK_DASHBOARD_SYNC_PENDING();
+  }
+}
+
+/* ── Process pending auto-provisions (called by MIS 15-min trigger) ── */
+function P1_PROCESS_AUTO_PROVISION_() {
+  const props = PropertiesService.getScriptProperties();
+  const all   = props.getProperties();
+  const keys  = Object.keys(all).filter(k => k.startsWith('AUTO_PROVISION_PENDING_'));
+  if(!keys.length) return;
+
+  keys.forEach(function(key) {
+    const empCode = key.replace('AUTO_PROVISION_PENDING_','');
+    try {
+      fixIndividualStaff_(empCode);
+      props.deleteProperty(key);
+      Logger.log('✅ Auto-provisioned: '+empCode);
+    } catch(e) {
+      LOG_ERR_('P1_PROCESS_AUTO_PROVISION_', empCode, e.message);
+    }
+  });
 }
 
 function P1_FORM_SUBMIT(e) {
@@ -1804,7 +1862,13 @@ function DC_INSTALL_P1_FINAL_() {
 
 function MIS_PIPELINE_RUN_() {
   const lock=LockService.getScriptLock(); if(!lock.tryLock(60000)){Logger.log('MIS: lock busy.');return;}
-  try{FETCH_AND_PROCESS_MIS_MAILS_();MIS_15MIN_FULL_SYNC_();PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());Logger.log('✅ MIS done');}
+  try{
+    FETCH_AND_PROCESS_MIS_MAILS_();
+    MIS_15MIN_FULL_SYNC_();
+    try{P1_PROCESS_AUTO_PROVISION_();}catch(_){}
+    PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());
+    Logger.log('✅ MIS done');
+  }
   catch(e){LOG_ERR_('MIS_PIPELINE_RUN','',e.message);}
   finally{try{lock.releaseLock();}catch(_){}}
 }
