@@ -82,7 +82,7 @@ const P1_TAB_MAP = {
     'LOGIN_ACCESS','WHATSAPP_VERIFIED','STAFF_URL','P1_WEBSITE_URL',
     'P1_SMART_FORM_URL','P1_DIGITAL_CARD_URL','P1_DASHBOARD_URL',
     'P1_CALLING_URL','P1_VOICE_URL','P1_QR_TEXT','P1_AVATAR_URL',
-    'P1_PERSONAL_FILE_URL','P1_SYNC_STATUS','P1_LAST_SYNC_AT',
+    'P1_PERSONAL_FILE_URL','P1_WORKSPACE_URL','P1_SYNC_STATUS','P1_LAST_SYNC_AT',
     'TELEGRAM_CHAT_ID','TELEGRAM_USERNAME','TELEGRAM_STATUS'],
   SMART_LOG:      () => ['TIMESTAMP','SOURCE_TYPE','SOURCE_NAME','DATA_FLOW',
     'LEAD_ID','CLIENT_NAME','CLIENT_MOBILE','PREFERRED_BANK','CASE_CATEGORY',
@@ -1178,7 +1178,8 @@ function DC_PROCESS_LEAD_(lead) {
     const cs=String(lead.CASE_CATEGORY||'').toUpperCase();
     if (cs==='DISBURSE'||cs==='DISBURSED') { try{NOTIFY_ACCOUNTS_ON_DISBURSE_(lead);}catch(_){} }
     try { SEND_SMART_MAIL_(lead,aiAdvice,emp); }  catch(me){ LOG_ERR_('MAIL',lead.LEAD_ID,me.message); }
-    try { SEND_TG_LEAD_ALERT_(lead,emp); }        catch(_){}
+    try { SEND_TG_LEAD_ALERT_(lead,emp); }        catch(te){ LOG_ERR_('TG_ALERT',lead.LEAD_ID,te.message); }
+    try { SEND_WA_LEAD_ALERT_(lead,emp); }        catch(we){ LOG_ERR_('WA_ALERT',lead.LEAD_ID,we.message); }
 
     return {ok:true,leadId:lead.LEAD_ID,tatDays:lead.TAT_DAYS,dataFlow:lead.DATA_FLOW,pfStatus};
   } catch(err){
@@ -1778,16 +1779,48 @@ function SETUP_STANDALONE_() {
   Logger.log('═══════════════════════════════  SETUP COMPLETE ✅  Next → DC_INSTALL_P1_FINAL_()');
 }
 
+function SELF_HEAL_TRIGGERS_() {
+  const HEAL_KEY='TRIGGER_HEAL_LAST';
+  if(SC_.get(HEAL_KEY))return; // already ran within last 6 hours
+  try{
+    const existing=new Set(ScriptApp.getProjectTriggers().map(t=>t.getHandlerFunction()));
+    const ss=DC_GET_SS_();
+    if(!existing.has('MIS_PIPELINE_RUN_'))
+      ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
+    if(!existing.has('SYNC_MASTER_CONTROL_CENTER_'))
+      ScriptApp.newTrigger('SYNC_MASTER_CONTROL_CENTER_').timeBased().everyHours(1).create();
+    if(!existing.has('DASHBOARD_SYNC_TRIGGER_ENGINE'))
+      ScriptApp.newTrigger('DASHBOARD_SYNC_TRIGGER_ENGINE').timeBased().everyMinutes(30).create();
+    if(!existing.has('SEND_EVENING_MIS_REPORT_'))
+      ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
+    if(!existing.has('ATTENDANCE_EOD_REPORT_'))
+      ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
+    if(!existing.has('HR_DAILY_ONBOARDING_FOLLOWUP_'))
+      ScriptApp.newTrigger('HR_DAILY_ONBOARDING_FOLLOWUP_').timeBased().atHour(10).everyDays(1).create();
+    if(!existing.has('P1_ROLE_DASHBOARD_DAILY_'))
+      ScriptApp.newTrigger('P1_ROLE_DASHBOARD_DAILY_').timeBased().atHour(6).everyDays(1).create();
+    if(!existing.has('P1_MAP_HTML_LINKS_'))
+      ScriptApp.newTrigger('P1_MAP_HTML_LINKS_').timeBased().atHour(5).everyDays(1).create();
+    if(!existing.has('P1_ON_EDIT_INSTALLABLE'))
+      try{ScriptApp.newTrigger('P1_ON_EDIT_INSTALLABLE').forSpreadsheet(ss).onEdit().create();}catch(_){}
+    if(!existing.has('P1_FORM_SUBMIT'))
+      try{ScriptApp.newTrigger('P1_FORM_SUBMIT').forSpreadsheet(ss).onFormSubmit().create();}catch(_){}
+    SC_.put(HEAL_KEY,'1',21600);
+    Logger.log('✅ SELF_HEAL_TRIGGERS_ complete');
+  }catch(e){Logger.log('SELF_HEAL_TRIGGERS_ warn: '+e.message);}
+}
+
 function DC_INSTALL_P1_FINAL_() {
   const ss=DC_GET_SS_();
   Object.keys(P1_TAB_MAP).forEach(name=>{if(!ss.getSheetByName(name))ss.insertSheet(name);P1_ENSURE_HEADERS_(ss.getSheetByName(name),P1_TAB_MAP[name]());});
   ['AVATAR_ACTIVITY_LOG','NOTIFY_QUEUE'].forEach(n=>{if(!ss.getSheetByName(n))ss.insertSheet(n);});
   SYNC_SOURCE_NAME_MASTER_();
   P1_CLIENT_DOCS_ROOT_();
-  const managed=['MIS_PIPELINE_RUN_','SYNC_MASTER_CONTROL_CENTER_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','HR_DAILY_ONBOARDING_FOLLOWUP_','P1_ROLE_DASHBOARD_DAILY_','P1_MAP_HTML_LINKS_','onEdit','P1_ON_EDIT_INSTALLABLE','P1_FORM_SUBMIT'];
+  const managed=['MIS_PIPELINE_RUN_','SYNC_MASTER_CONTROL_CENTER_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','HR_DAILY_ONBOARDING_FOLLOWUP_','P1_ROLE_DASHBOARD_DAILY_','P1_MAP_HTML_LINKS_','DASHBOARD_SYNC_TRIGGER_ENGINE','onEdit','P1_ON_EDIT_INSTALLABLE','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
   ScriptApp.newTrigger('SYNC_MASTER_CONTROL_CENTER_').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('DASHBOARD_SYNC_TRIGGER_ENGINE').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
   ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
   ScriptApp.newTrigger('HR_DAILY_ONBOARDING_FOLLOWUP_').timeBased().atHour(10).everyDays(1).create();
@@ -1804,7 +1837,14 @@ function DC_INSTALL_P1_FINAL_() {
 
 function MIS_PIPELINE_RUN_() {
   const lock=LockService.getScriptLock(); if(!lock.tryLock(60000)){Logger.log('MIS: lock busy.');return;}
-  try{FETCH_AND_PROCESS_MIS_MAILS_();MIS_15MIN_FULL_SYNC_();PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());Logger.log('✅ MIS done');}
+  try{
+    try{SELF_HEAL_TRIGGERS_();}catch(_){}
+    FETCH_AND_PROCESS_MIS_MAILS_();
+    MIS_15MIN_FULL_SYNC_();
+    try{P1_PROCESS_AUTO_PROVISION_();}catch(_){}
+    PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());
+    Logger.log('✅ MIS done');
+  }
   catch(e){LOG_ERR_('MIS_PIPELINE_RUN','',e.message);}
   finally{try{lock.releaseLock();}catch(_){}}
 }
@@ -1849,19 +1889,15 @@ function ATTENDANCE_EOD_REPORT_LEGACY_() {
    ================================================================ */
 
 function doGet(e) {
+  try{SELF_HEAL_TRIGGERS_();}catch(_){} // auto-install missing triggers on first open
   e=e||{}; const p=e.parameter||{};
   const page=String(p.page||'home').trim().toLowerCase();
   let emp=String(p.emp||p.emp_code||'').trim().toUpperCase();
   if(!emp){try{const email=String(Session.getActiveUser().getEmail()||'').toLowerCase();if(email){const map=DC_BUILD_EMP_MAP_();for(const code of Object.keys(map)){if(map[code].EMAIL===email){emp=code;break;}}}}catch(_){}}
   try {
     const base=P1_GET_EXEC_URL_();
-    /* Legacy title rows are retained below only to avoid an unsafe bulk rewrite.
-    if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Divyanshi Capital AI Based OS — Smart Intake').addMetaTag('viewport','width=device-width,initial-scale=1).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    if(page==='calling'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return P1_HTML_FROM_FILES_(['DC_CALLING_APP','calling']).setTitle('Divyanshi Capital AI Based OS — Calling').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1);
-    if(page==='voice'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return HtmlService.createHtmlOutputFromFile('voice').setTitle('Divyanshi Capital AI Based OS — Voice').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1);
-    */
     if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Divyanshi Capital AI Based OS - Smart Intake').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    if(page==='calling'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return P1_HTML_FROM_FILES_(['DC_CALLING_APP','calling']).setTitle('Divyanshi Capital AI Based OS - Calling').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
+    if(page==='calling'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return P1_HTML_FROM_FILES_(['calling']).setTitle('Divyanshi Capital AI Based OS - Calling').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
     if(page==='voice'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return HtmlService.createHtmlOutputFromFile('voice').setTitle('Divyanshi Capital AI Based OS - Voice').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
     const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),dashboard:page==='dashboard'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token)?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
@@ -1951,6 +1987,40 @@ function BULBHUL_CHAT_API(d)          { d=d||{};return P1_VALIDATE_ACCESS_TOKEN_
 function GET_ACTIVE_LOAN_PRODUCTS()   { return GET_ACTIVE_LOAN_PRODUCTS_(); }
 function P1_GET_BANK_OPTIONS_MAP()    { return P1_GET_BANK_OPTIONS_MAP_(); }
 function MANAGER_CHECKIN_API(d)       { const a=P1_REQUIRE_API_ACTOR_(d||{}); return a?MANAGER_SELFIE_CHECKIN_(a.EMP_CODE,d.half||1):{ok:false,err:'Employee session required'}; }
+
+function DC_TG_BROADCAST(message,auth) {
+  auth=auth||{};
+  const actor=P1_REQUIRE_API_ACTOR_(auth);
+  if(!actor||!P1_HAS_MASTER_ACCESS_(actor))return 'Access denied: Manager-level access required to broadcast.';
+  const msg=String(message||'').trim().slice(0,4096);
+  if(!msg)return 'Message is empty.';
+  const ids=DC_GET_CORE_TG_IDS_();
+  let sent=0;ids.forEach(id=>{if(DC_SEND_TG_MESSAGE_(id,msg))sent++;});
+  DC_SEND_TG_(`📢 *Campaign by ${actor.NAME||actor.EMP_CODE}:*\n${msg.slice(0,300)}`);
+  return sent>0?`✅ Campaign sent to ${sent} channel${sent===1?'':'s'}.`:'⚠ No Telegram channels configured. Add TG Chat IDs in Script Properties.';
+}
+
+function P1_SAVE_CALC_LEAD(data) {
+  try {
+    data=data||{};
+    const sh=GET_OR_CREATE_('COMMON_ENTRY');
+    const h=P1_ENSURE_HEADERS_(sh,P1_TAB_MAP.COMMON_ENTRY());
+    sh.appendRow(P1_BUILD_ROW_(h,{
+      TIMESTAMP:new Date(),
+      CLIENT_MOBILE:DC_CLEAN_MOBILE_(data.mobile||''),
+      MONTHLY_INCOME:Number(data.income||0),
+      EXISTING_EMI:Number(data.emi||0),
+      LOAN_TYPE:String(data.loanType||data.loan_type||'').trim(),
+      REQUIRED_LOAN_AMOUNT:Number(data.loanAmount||data.eligible_amount||0),
+      CASE_CATEGORY:'CALC_LEAD',
+      SOURCE_TYPE:'WEBSITE',
+      SOURCE_NAME:'EMI_CALCULATOR',
+      DATA_FLOW:'SALES',
+      REMARKS:String(data.remarks||'EMI calculator enquiry').slice(0,200)
+    }));
+    return {ok:true,msg:'Enquiry recorded'};
+  } catch(e){ LOG_ERR_('P1_SAVE_CALC_LEAD','',e.message); return {ok:false,err:e.message}; }
+}
 function RUN_MIS_PIPELINE_NOW()       { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); MIS_PIPELINE_RUN_(); }
 function RUN_MIS_EVENING_REPORT()     { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); SEND_EVENING_MIS_REPORT_(); }
 function CLEAR_CACHE_NOW()            { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); INVALIDATE_ALL_CACHES_(); Logger.log('✅ All caches cleared'); }
@@ -2129,6 +2199,7 @@ function _techFix_ScriptProperties_(ui, props) {
     'MASTER_FILE_ID','P1_EXEC_URL','MALLIK_API_KEY',
     'DEEPSEEK_API_KEY','OPENAI_API_KEY','GEMINI_API_KEY',
     'TG_TOKEN','META_WA_TOKEN','META_WA_PHONE_ID',
+    'FOUNDER_WA_PHONE','MD_WA_PHONE','HR_WA_PHONE','ACCOUNTS_WA_PHONE',
     'MD_TG_CHAT_ID','FOUNDER_TG_CHAT_ID','HR_TG_CHAT_ID','ACCOUNTS_TG_CHAT_ID','MD_TG_EMP_CODE','FOUNDER_TG_EMP_CODE','HR_TG_EMP_CODE','ACCOUNTS_TG_EMP_CODE','TG_WEBHOOK_SECRET',
     'TEMPLATE_PERSONAL_FILE_ID','ONBOARDING_DRIVE_FOLDER_ID',
     'HR_TC_FILE_ID','HR_TC_URL','HR_ICARD_FILE_ID','COMPANY_WEBSITE_URL','EMPLOYEE_PORTAL_URL','PRIVACY_NOTICE_URL','PRIVACY_CONTACT_EMAIL','GRIEVANCE_OFFICER_NAME','CLIENT_RETENTION_DAYS','CANDIDATE_RETENTION_DAYS','CONSENT_VERSION','CLIENT_DOCS_FOLDER_ID','FREEPBX_WEBHOOK_URL','FREEPBX_API_TOKEN','WEBSITE_MANAGER_EMAIL_ID'
@@ -2747,13 +2818,13 @@ function MLA_UPDATE_MINI_STATUS(data){return P1_CALLING_UPDATE_(data);}
 
 function P1_VERIFY_ACCESS(empCode,pin) {
   const code=String(empCode||'').trim().toUpperCase(),attemptKey='P1_LOGIN_FAIL_'+code;
-  const lock=LockService.getScriptLock();if(!lock.tryLock(5000))return{ok:false,err:'Sign-in service busy. Retry shortly.'};
+  const lock=LockService.getScriptLock();if(!lock.tryLock(5000))return{ok:false,success:false,err:'Sign-in service busy. Retry shortly.',errorMessage:'Sign-in service busy. Retry shortly.'};
   try{
-    const attempts=Number(SC_.get(attemptKey)||0);if(attempts>=5)return{ok:false,err:'Too many failed attempts. Try again after 5 minutes.'};
+    const attempts=Number(SC_.get(attemptKey)||0);if(attempts>=5)return{ok:false,success:false,err:'Too many failed attempts. Try again after 5 minutes.',errorMessage:'Too many failed attempts. Try again after 5 minutes.'};
     const emp=FIND_EMPLOYEE_FULL_(code),valid=!!emp&&P1_VERIFY_PIN_(code,String(pin||'').trim());
-    if(!valid){SC_.put(attemptKey,String(attempts+1),300);return{ok:false,err:'Invalid employee code or PIN'};}
+    if(!valid){SC_.put(attemptKey,String(attempts+1),300);return{ok:false,success:false,err:'Invalid employee code or PIN',errorMessage:'Invalid employee code or PIN'};}
     SC_.remove(attemptKey);
-    return{ok:true,empCode:emp.EMP_CODE,name:emp.NAME,role:emp.ROLE,department:emp.DEPARTMENT||'',email:emp.EMAIL||'',manager_email_id:emp.MANAGER_EMAIL||'',accessToken:P1_ISSUE_ACCESS_TOKEN_(emp.EMP_CODE),err:''};
+    return{ok:true,success:true,empCode:emp.EMP_CODE,name:emp.NAME,role:emp.ROLE,department:emp.DEPARTMENT||'',email:emp.EMAIL||'',manager_email_id:emp.MANAGER_EMAIL||'',accessToken:P1_ISSUE_ACCESS_TOKEN_(emp.EMP_CODE),err:'',errorMessage:''};
   }finally{lock.releaseLock();}
 }
 
