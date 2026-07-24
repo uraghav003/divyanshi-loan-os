@@ -1179,6 +1179,7 @@ function DC_PROCESS_LEAD_(lead) {
     if (cs==='DISBURSE'||cs==='DISBURSED') { try{NOTIFY_ACCOUNTS_ON_DISBURSE_(lead);}catch(_){} }
     try { SEND_SMART_MAIL_(lead,aiAdvice,emp); }  catch(me){ LOG_ERR_('MAIL',lead.LEAD_ID,me.message); }
     try { SEND_TG_LEAD_ALERT_(lead,emp); }        catch(_){}
+    try { SEND_WA_LEAD_ALERT_(lead,emp); }        catch(_){}
 
     return {ok:true,leadId:lead.LEAD_ID,tatDays:lead.TAT_DAYS,dataFlow:lead.DATA_FLOW,pfStatus};
   } catch(err){
@@ -1346,6 +1347,41 @@ function DC_SEND_WA_(to,text) {
     UrlFetchApp.fetch(`https://graph.facebook.com/v20.0/${phoneId}/messages`,{method:'post',headers:{Authorization:'Bearer '+token},contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({messaging_product:'whatsapp',to:String(to).replace(/\D/g,''),type:'text',text:{body:String(text||'').slice(0,4096)}})});
     return true;
   } catch(e){ LOG_ERR_('WA_SEND',to,e.message); return false; }
+}
+
+function DC_GET_CORE_WA_NUMBERS_() {
+  const p=PropertiesService.getScriptProperties();
+  return ['FOUNDER_WA_PHONE','MD_WA_PHONE','HR_WA_PHONE','ACCOUNTS_WA_PHONE']
+    .map(k=>String(p.getProperty(k)||'').trim().replace(/\D/g,''))
+    .filter(n=>n.length>=10);
+}
+
+function BUILD_WA_LEAD_MSG_(lead,emp) {
+  const tatDays=Number(lead.TAT_DAYS)||GET_TAT_BY_PRODUCT_(lead.LOAN_TYPE);
+  const dl=lead.TAT_DEADLINE?new Date(lead.TAT_DEADLINE):new Date(Date.now()+tatDays*86400000);
+  const aiShort=String(lead.AI_ADVICE||'').split('\n').slice(0,4).join('\n').slice(0,300);
+  return (
+    `🆕 *NEW LEAD — ${lead.DATA_FLOW||'SALES'}*\n`+
+    `━━━━━━━━━━━━━━━━━\n`+
+    `🪪 Lead: ${lead.LEAD_ID||'N/A'}\n`+
+    `👤 Client: ${lead.CLIENT_NAME||'N/A'}\n`+
+    `📱 Mobile: ${lead.CLIENT_MOBILE||'N/A'}\n`+
+    `💳 Loan: ${lead.LOAN_TYPE||'N/A'} | ₹${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')}\n`+
+    `🏦 Bank: ${lead.PREFERRED_BANK||'TBD'}\n`+
+    `⏱ TAT: ${tatDays}d | ⚠ ${Utilities.formatDate(dl,'Asia/Kolkata','dd MMM yyyy')}\n`+
+    `👔 Owner: ${emp?emp.NAME:'Unassigned'} (${lead.EMP_CODE||'—'})\n`+
+    `📋 Remarks: ${String(lead.REMARKS||'N/A').slice(0,100)}\n`+
+    `━━━━━━━━━━━━━━━━━\n`+
+    `🤖 *Divyanshi Assistant:*\n${aiShort}`
+  );
+}
+
+function SEND_WA_LEAD_ALERT_(lead,emp) {
+  const msg=BUILD_WA_LEAD_MSG_(lead,emp);
+  const nums=new Set(DC_GET_CORE_WA_NUMBERS_());
+  if(emp&&emp.WHATSAPP&&String(emp.WHATSAPP).replace(/\D/g,'').length>=10)
+    nums.add(String(emp.WHATSAPP).replace(/\D/g,''));
+  nums.forEach(n=>{try{DC_SEND_WA_(n,msg);}catch(_){}});
 }
 
 /* ================================================================
