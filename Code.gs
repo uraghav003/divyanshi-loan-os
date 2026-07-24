@@ -1779,6 +1779,37 @@ function SETUP_STANDALONE_() {
   Logger.log('═══════════════════════════════  SETUP COMPLETE ✅  Next → DC_INSTALL_P1_FINAL_()');
 }
 
+function SELF_HEAL_TRIGGERS_() {
+  const HEAL_KEY='TRIGGER_HEAL_LAST';
+  if(SC_.get(HEAL_KEY))return; // already ran within last 6 hours
+  try{
+    const existing=new Set(ScriptApp.getProjectTriggers().map(t=>t.getHandlerFunction()));
+    const ss=DC_GET_SS_();
+    if(!existing.has('MIS_PIPELINE_RUN_'))
+      ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
+    if(!existing.has('SYNC_MASTER_CONTROL_CENTER_'))
+      ScriptApp.newTrigger('SYNC_MASTER_CONTROL_CENTER_').timeBased().everyHours(1).create();
+    if(!existing.has('DASHBOARD_SYNC_TRIGGER_ENGINE'))
+      ScriptApp.newTrigger('DASHBOARD_SYNC_TRIGGER_ENGINE').timeBased().everyMinutes(30).create();
+    if(!existing.has('SEND_EVENING_MIS_REPORT_'))
+      ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
+    if(!existing.has('ATTENDANCE_EOD_REPORT_'))
+      ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
+    if(!existing.has('HR_DAILY_ONBOARDING_FOLLOWUP_'))
+      ScriptApp.newTrigger('HR_DAILY_ONBOARDING_FOLLOWUP_').timeBased().atHour(10).everyDays(1).create();
+    if(!existing.has('P1_ROLE_DASHBOARD_DAILY_'))
+      ScriptApp.newTrigger('P1_ROLE_DASHBOARD_DAILY_').timeBased().atHour(6).everyDays(1).create();
+    if(!existing.has('P1_MAP_HTML_LINKS_'))
+      ScriptApp.newTrigger('P1_MAP_HTML_LINKS_').timeBased().atHour(5).everyDays(1).create();
+    if(!existing.has('P1_ON_EDIT_INSTALLABLE'))
+      try{ScriptApp.newTrigger('P1_ON_EDIT_INSTALLABLE').forSpreadsheet(ss).onEdit().create();}catch(_){}
+    if(!existing.has('P1_FORM_SUBMIT'))
+      try{ScriptApp.newTrigger('P1_FORM_SUBMIT').forSpreadsheet(ss).onFormSubmit().create();}catch(_){}
+    SC_.put(HEAL_KEY,'1',21600);
+    Logger.log('✅ SELF_HEAL_TRIGGERS_ complete');
+  }catch(e){Logger.log('SELF_HEAL_TRIGGERS_ warn: '+e.message);}
+}
+
 function DC_INSTALL_P1_FINAL_() {
   const ss=DC_GET_SS_();
   Object.keys(P1_TAB_MAP).forEach(name=>{if(!ss.getSheetByName(name))ss.insertSheet(name);P1_ENSURE_HEADERS_(ss.getSheetByName(name),P1_TAB_MAP[name]());});
@@ -1806,7 +1837,14 @@ function DC_INSTALL_P1_FINAL_() {
 
 function MIS_PIPELINE_RUN_() {
   const lock=LockService.getScriptLock(); if(!lock.tryLock(60000)){Logger.log('MIS: lock busy.');return;}
-  try{FETCH_AND_PROCESS_MIS_MAILS_();MIS_15MIN_FULL_SYNC_();PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());Logger.log('✅ MIS done');}
+  try{
+    try{SELF_HEAL_TRIGGERS_();}catch(_){}
+    FETCH_AND_PROCESS_MIS_MAILS_();
+    MIS_15MIN_FULL_SYNC_();
+    try{P1_PROCESS_AUTO_PROVISION_();}catch(_){}
+    PropertiesService.getScriptProperties().setProperty('MIS_LAST_RUN',new Date().toISOString());
+    Logger.log('✅ MIS done');
+  }
   catch(e){LOG_ERR_('MIS_PIPELINE_RUN','',e.message);}
   finally{try{lock.releaseLock();}catch(_){}}
 }
@@ -1851,6 +1889,7 @@ function ATTENDANCE_EOD_REPORT_LEGACY_() {
    ================================================================ */
 
 function doGet(e) {
+  try{SELF_HEAL_TRIGGERS_();}catch(_){} // auto-install missing triggers on first open
   e=e||{}; const p=e.parameter||{};
   const page=String(p.page||'home').trim().toLowerCase();
   let emp=String(p.emp||p.emp_code||'').trim().toUpperCase();
