@@ -43,11 +43,12 @@ Satisfy all requirements for Divyanshi Capital Loan OS: create SETUP_PROPERTIES.
 ## Team Roster
 | Agent | Type | Work Item | Status | Conv ID |
 |-------|------|-----------|--------|---------|
+| Explorer | teamwork_preview_explorer | Analyze codebase, property keys, git state & draft specs | in-progress | a5aa28d6-aa00-4b38-b496-993a1f1ecb36 |
 
 ## Succession Status
 - Succession required: no
-- Spawn count: 0 / 16
-- Pending subagents: none
+- Spawn count: 1 / 16
+- Pending subagents: a5aa28d6-aa00-4b38-b496-993a1f1ecb36
 - Predecessor: none
 - Successor: not yet spawned
 
