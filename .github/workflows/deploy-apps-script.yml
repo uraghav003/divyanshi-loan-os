@@ -15,15 +15,131 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install clasp
-        run: npm install -g @google/clasp
-
-      - name: Write clasp credentials
-        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
-
-      - name: Write clasp project config
+      - name: Deploy to Apps Script
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
         run: |
-          echo '{"scriptId":"${{ secrets.APPS_SCRIPT_ID }}","rootDir":"."}' > .clasp.json
+          node - <<'JSEOF'
+          const https = require('https');
+          const fs    = require('fs');
+          const path  = require('path');
 
-      - name: Push to Apps Script
-        run: clasp push --force
+          const creds     = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+          const scriptId  = process.env.APPS_SCRIPT_ID;
+
+          // ── Get access token from refresh token ──
+          function getAccessToken() {
+            return new Promise((resolve, reject) => {
+              const body = new URLSearchParams({
+                client_id:     creds.client_id,
+                client_secret: creds.client_secret,
+                refresh_token: creds.refresh_token,
+                grant_type:    'refresh_token'
+              }).toString();
+              const req = https.request({
+                hostname: 'oauth2.googleapis.com',
+                path:     '/token',
+                method:   'POST',
+                headers:  { 'Content-Type': 'application/x-www-form-urlencoded' }
+              }, res => {
+                let data = '';
+                res.on('data', d => data += d);
+                res.on('end', () => {
+                  const r = JSON.parse(data);
+                  if (r.access_token) resolve(r.access_token);
+                  else reject(new Error('Token error: ' + data));
+                });
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          // ── Build files array for Apps Script API ──
+          function buildFiles() {
+            const files = [];
+            const dir   = process.cwd();
+
+            // appsscript.json → must be named "appsscript"
+            files.push({
+              name:   'appsscript',
+              type:   'JSON',
+              source: fs.readFileSync('appsscript.json', 'utf8')
+            });
+
+            // .gs files
+            for (const f of fs.readdirSync(dir).sort()) {
+              if (f.endsWith('.gs')) {
+                files.push({
+                  name:   path.basename(f, '.gs'),
+                  type:   'SERVER_JS',
+                  source: fs.readFileSync(f, 'utf8')
+                });
+              }
+            }
+
+            // .html files
+            for (const f of fs.readdirSync(dir).sort()) {
+              if (f.endsWith('.html')) {
+                files.push({
+                  name:   path.basename(f, '.html'),
+                  type:   'HTML',
+                  source: fs.readFileSync(f, 'utf8')
+                });
+              }
+            }
+
+            return files;
+          }
+
+          // ── Push to Apps Script API ──
+          function pushFiles(token, files) {
+            return new Promise((resolve, reject) => {
+              const body = JSON.stringify({ files });
+              const req  = https.request({
+                hostname: 'script.googleapis.com',
+                path:     `/v1/projects/${scriptId}/content`,
+                method:   'PUT',
+                headers:  {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type':  'application/json',
+                  'Content-Length': Buffer.byteLength(body)
+                }
+              }, res => {
+                let data = '';
+                res.on('data', d => data += d);
+                res.on('end', () => resolve({ status: res.statusCode, body: data }));
+              });
+              req.on('error', reject);
+              req.write(body);
+              req.end();
+            });
+          }
+
+          (async () => {
+            try {
+              console.log('🔑 Getting access token...');
+              const token = await getAccessToken();
+
+              console.log('📦 Building file payload...');
+              const files = buildFiles();
+              console.log(`   → ${files.length} files`);
+
+              console.log('🚀 Pushing to Apps Script...');
+              const result = await pushFiles(token, files);
+
+              if (result.status === 200) {
+                console.log('✅ Deploy successful! Apps Script updated.');
+              } else {
+                const err = JSON.parse(result.body);
+                console.error('❌ Deploy failed:', err.error?.message || result.body);
+                process.exit(1);
+              }
+            } catch (e) {
+              console.error('❌ Error:', e.message);
+              process.exit(1);
+            }
+          })();
+          JSEOF
