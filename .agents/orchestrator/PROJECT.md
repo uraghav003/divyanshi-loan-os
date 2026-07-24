@@ -1,34 +1,28 @@
-# Project: Divyanshi Capital Loan OS
+# Project: Divyanshi Capital Loan OS Setup & Deployment
 
 ## Architecture
-Google Apps Script (GAS) Web App backed by Google Sheets.
-- Backend: `Code.gs` (handles `doGet`, `doPost`, MIS engine, Dashboard protection, 15-min sync)
-- Config: `appsscript.json` (OAuth scopes, runtime version V8, webapp execution context)
-- Frontend templates:
-  - `index.html` (Main dashboard & overview interface)
-  - `smart_form.html` (Multi-step intake form with doc checklist & bank chip selector)
-  - `calling.html` (Calling workspace: contact card, call controls, stats grid, AI agent card)
-  - `voice.html` (Voice assistant / agent view)
+Google Apps Script Web App for Divyanshi Capital Loan OS.
+- `Code.gs`: Core server-side controller, API router, auth gate, intake forms, MIS generator.
+- `index.html`: Main web app UI shell.
+- `smart_form.html`: Borrower loan application intake form.
+- `calling.html`: Telecalling & CRM portal interface.
+- `voice.html`: Voice AI / call logs interface.
+- `appsscript.json`: Manifest configuration (timeZone, dependencies, webapp access).
+- `SETUP_PROPERTIES.gs`: Apps Script helper script to set non-secret script properties and verify state.
+- `SETUP.md`: Full step-by-step deployment guide & Apps Script instructions.
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | M1_Explore | Fetch raw HTML files from GitHub and analyze truncation points and styling requirements | None | IN_PROGRESS |
-| 2 | M2_HTML_Completion | Complete missing CSS, HTML, and JS in index.html, smart_form.html, calling.html, voice.html | M1 | PLANNED |
-| 3 | M3_Consistency | Cross-file consistency checks for actions, doGet mappings, appsscript.json scopes, Code.gs helper functions | M2 | PLANNED |
-| 4 | M4_Verification_GitPush | Independent review, adversarial testing, forensic audit, git commit and push | M3 | PLANNED |
+| 1 | M1: SETUP_PROPERTIES.gs | Create SETUP_PROPERTIES.gs with setupProperties() and verifyProperties() | None | PLANNED |
+| 2 | M2: SETUP.md | Create SETUP.md deployment guide with full instructions | None | PLANNED |
+| 3 | M3: Git Push | Stage changed/new files, commit with feat message, push to main | M1, M2 | PLANNED |
+| 4 | M4: Audit & Verification | Perform reviewer, challenger, and forensic audit checks | M3 | PLANNED |
+
+## Interface Contracts
+- `setupProperties()`: Sets default non-secret properties (`PRIVACY_NOTICE_URL`, `CONSENT_VERSION`, `PRIVACY_CONTACT_EMAIL`, `GRIEVANCE_OFFICER_NAME`, `HR_TC_URL`, `COMPANY_WEBSITE_URL`) if missing. Defines TODO placeholder instructions for secret keys (`MALLIK_API_KEY`, `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `CLIENT_DOCS_FOLDER_ID`). Must be idempotent.
+- `verifyProperties()`: Logs all 11 keys and reports status (`SET` vs `MISSING`).
 
 ## Code Layout
 - Root directory: `C:\Users\aecr\My Drive\Antigravity\divyanshi-loan-os`
-  - `Code.gs`
-  - `appsscript.json`
-  - `index.html`
-  - `smart_form.html`
-  - `calling.html`
-  - `voice.html`
-
-## Design & Palette Constraints
-- `--primary`: `#C9A84C` (Gold)
-- `--bg`: `#0B1F3A` (Dark Blue)
-- Minimal changes only — do NOT redesign or rebuild.
-- Complete truncated portions matching existing structure, naming conventions, and style rules.
+- Code files: `Code.gs`, `appsscript.json`, `index.html`, `smart_form.html`, `calling.html`, `voice.html`, `SETUP_PROPERTIES.gs`, `SETUP.md`.
