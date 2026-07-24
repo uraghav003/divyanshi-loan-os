@@ -1183,6 +1183,10 @@ function P1_HANDLE_INTAKE_(p) {
 
   MARK_DASHBOARD_SYNC_PENDING();
   SC_.remove('MASTER_SNAP_V1');
+  // Fire notifications async-style (errors logged, never block response)
+  const emp = FIND_EMPLOYEE_FULL_(empCode);
+  try { SEND_TG_LEAD_ALERT_(obj, emp); }  catch(te){ LOG_ERR_('TG_ALERT', leadId, te.message); }
+  try { SEND_WA_LEAD_ALERT_(obj, emp); }  catch(we){ LOG_ERR_('WA_ALERT', leadId, we.message); }
   return {ok:true, lead_id: leadId, message:'Entry received. Our team will contact you shortly.'};
 }
 
@@ -1191,6 +1195,7 @@ function P1_HANDLE_INTAKE_(p) {
    ================================================================ */
 
 function doGet(e) {
+  try { SELF_HEAL_TRIGGERS_(); } catch(_){}
   const p    = e && e.parameter ? e.parameter : {};
   const page = String(p.page || '').toLowerCase().trim();
   try {
@@ -1419,6 +1424,7 @@ function onEdit(e) {
 
 // Time-driven trigger: run every 15 min via Apps Script Triggers UI
 function MIS_TRIGGER_15MIN_() {
+  try { SELF_HEAL_TRIGGERS_(); } catch(_){}
   try { MIS_15MIN_FULL_SYNC_(); } catch(e) { LOG_ERR_('MIS_TRIGGER_15MIN_','',e.message); }
 }
 
@@ -1451,21 +1457,26 @@ function P1_SMART_FORM_SUBMIT(payload) {
  * Endpoint used by index.html & staff portal access gates.
  */
 function P1_VERIFY_ACCESS(empCode, pinCode) {
+  const code = String(empCode || '').trim().toUpperCase();
+  const pin  = String(pinCode || '').trim();
+  if (!code) return { ok:false, success:false, err:'Employee code required', errorMessage:'Employee code required' };
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return { ok:false, success:false, err:'Sign-in service busy. Retry.', errorMessage:'Sign-in service busy. Retry.' };
   try {
-    const code = String(empCode || '').trim().toUpperCase();
-    if (!code) {
-      return { success: false, errorMessage: 'Employee code required' };
-    }
+    const attemptKey = 'P1_LOGIN_FAIL_' + code;
+    const attempts   = Number(SC_.get(attemptKey) || 0);
+    if (attempts >= 5) return { ok:false, success:false, err:'Too many failed attempts. Try after 5 minutes.', errorMessage:'Too many failed attempts. Try after 5 minutes.' };
     const emp = FIND_EMPLOYEE_FULL_(code);
-    if (emp || /^DC\d{1,5}$/i.test(code)) {
-      const accessToken = 'SESS_' + code + '_' + Date.now().toString(36);
-      return { success: true, ok: true, accessToken: accessToken, empCode: code };
+    const storedPwd = emp ? String(emp.PASSWORD || emp.LOGIN_PASSWORD || '').trim() : '';
+    const valid = !!emp && (storedPwd === '' || storedPwd === pin);
+    if (!valid) {
+      SC_.put(attemptKey, String(attempts + 1), 300);
+      return { ok:false, success:false, err:'Invalid employee code or PIN', errorMessage:'Invalid employee code or PIN' };
     }
-    return { success: false, errorMessage: 'Invalid employee code or access denied' };
-  } catch (err) {
-    LOG_ERR_('P1_VERIFY_ACCESS', String(empCode), err.message);
-    return { success: false, errorMessage: err.message || 'Verification error' };
-  }
+    SC_.remove(attemptKey);
+    const accessToken = 'SESS_' + code + '_' + Date.now().toString(36);
+    return { ok:true, success:true, accessToken, empCode:code, name:emp.NAME||emp.EMPLOYEES_NAME||'', role:emp.ROLE||'', department:emp.DEPARTMENT||'', email:emp.EMAIL||emp.EMPLOYEE_EMAIL||'', err:'', errorMessage:'' };
+  } finally { lock.releaseLock(); }
 }
 
 /**
@@ -1787,11 +1798,109 @@ function MLA_UPDATE_MINI_STATUS(p) {
  */
 function DC_TG_BROADCAST(message, p) {
   try {
-    const msg = String(message || (p && p.message) || '');
-    return { ok: true, success: true, broadcastId: 'TG_' + Date.now().toString(36), message: msg };
+    const msg = String(message || (p && p.message) || '').trim().slice(0, 4096);
+    if (!msg) return { ok:false, success:false, err:'Message empty' };
+    const ids = DC_GET_CORE_TG_IDS_();
+    let sent = 0;
+    ids.forEach(id => { try { if (DC_SEND_TG_MESSAGE_(id, msg)) sent++; } catch(_){} });
+    return { ok:true, success:true, sent, broadcastId:'TG_'+Date.now().toString(36) };
   } catch (err) {
-    return { ok: false, success: false, err: err.message };
+    return { ok:false, success:false, err:err.message };
   }
+}
+
+/* ================================================================
+   SECTION — MESSAGING: TELEGRAM + WHATSAPP
+   ================================================================ */
+
+function DC_GET_CORE_TG_IDS_() {
+  const p = PropertiesService.getScriptProperties();
+  return ['FOUNDER_TG_ID','MD_TG_ID','HR_TG_ID','ALERT_TG_CHAT_ID']
+    .map(k => String(p.getProperty(k)||'').trim()).filter(Boolean);
+}
+
+function DC_SEND_TG_MESSAGE_(chatId, text) {
+  const token = DC_CFG.TG_TOKEN;
+  if (!token || !chatId) return false;
+  try {
+    const res = UrlFetchApp.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method:'post', contentType:'application/json', muteHttpExceptions:true,
+      payload: JSON.stringify({ chat_id:chatId, text:text, parse_mode:'Markdown' })
+    });
+    return JSON.parse(res.getContentText()).ok === true;
+  } catch(_){ return false; }
+}
+
+function DC_SEND_TG_(text) {
+  DC_GET_CORE_TG_IDS_().forEach(id => { try { DC_SEND_TG_MESSAGE_(id, text); } catch(_){} });
+}
+
+function DC_SEND_WA_(to, text) {
+  const token = DC_CFG.META_WA_TOKEN, phoneId = DC_CFG.META_WA_PHONE_ID;
+  if (!token || !phoneId || !to) return;
+  const num = String(to).replace(/\D/g,'');
+  if (num.length < 10) return;
+  UrlFetchApp.fetch(`https://graph.facebook.com/v18.0/${phoneId}/messages`, {
+    method:'post', contentType:'application/json', muteHttpExceptions:true,
+    headers:{ Authorization:'Bearer '+token },
+    payload: JSON.stringify({ messaging_product:'whatsapp', to:num.startsWith('91')?num:'91'+num, type:'text', text:{body:text} })
+  });
+}
+
+function DC_GET_CORE_WA_NUMBERS_() {
+  const p = PropertiesService.getScriptProperties();
+  return ['FOUNDER_WA_PHONE','MD_WA_PHONE','HR_WA_PHONE','ACCOUNTS_WA_PHONE']
+    .map(k => String(p.getProperty(k)||'').trim().replace(/\D/g,''))
+    .filter(n => n.length >= 10);
+}
+
+function BUILD_WA_LEAD_MSG_(lead, emp) {
+  const tatDays = Number(lead.TAT_DAYS)||3;
+  const dl = lead.TAT_DEADLINE ? new Date(lead.TAT_DEADLINE) : new Date(Date.now()+tatDays*86400000);
+  return `🆕 *NEW LEAD — ${lead.DATA_FLOW||'SALES'}*\n━━━━━━━━━━━━━━━\n` +
+    `🪪 ${lead.LEAD_ID||'N/A'} | 👤 ${lead.CLIENT_NAME||'N/A'}\n` +
+    `📱 ${lead.CLIENT_MOBILE||'N/A'}\n` +
+    `💳 ${lead.LOAN_TYPE||'N/A'} ₹${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')}\n` +
+    `⏱ TAT: ${tatDays}d | ⚠ ${Utilities.formatDate(dl,'Asia/Kolkata','dd MMM yyyy')}\n` +
+    `👔 ${emp?emp.NAME||emp.EMPLOYEES_NAME:'Unassigned'} (${lead.EMP_CODE||'—'})\n━━━━━━━━━━━━━━━`;
+}
+
+function SEND_WA_LEAD_ALERT_(lead, emp) {
+  try {
+    const msg = BUILD_WA_LEAD_MSG_(lead, emp);
+    const nums = new Set(DC_GET_CORE_WA_NUMBERS_());
+    const wa = emp && (emp.WHATSAPP_VERIFIED||emp.MOBILE||'');
+    if (wa) { const n=String(wa).replace(/\D/g,''); if(n.length>=10) nums.add(n); }
+    nums.forEach(n => { try { DC_SEND_WA_(n, msg); } catch(_){} });
+  } catch(e){ LOG_ERR_('SEND_WA_LEAD_ALERT_','',e.message); }
+}
+
+function SEND_TG_LEAD_ALERT_(lead, emp) {
+  try {
+    const msg = BUILD_WA_LEAD_MSG_(lead, emp);
+    DC_SEND_TG_(msg);
+    const tgId = emp && (emp.TELEGRAM_CHAT_ID||emp.TG_CHAT_ID||'');
+    if (tgId) DC_SEND_TG_MESSAGE_(tgId, msg);
+  } catch(e){ LOG_ERR_('SEND_TG_LEAD_ALERT_','',e.message); }
+}
+
+/* ================================================================
+   SECTION — SELF-HEALING TRIGGERS
+   ================================================================ */
+
+function SELF_HEAL_TRIGGERS_() {
+  if (SC_.get('TRIGGER_HEAL_LAST')) return;
+  try {
+    const ex = new Set(ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction()));
+    const ss = DC_GET_SS_();
+    if (!ex.has('MIS_TRIGGER_15MIN_'))        ScriptApp.newTrigger('MIS_TRIGGER_15MIN_').timeBased().everyMinutes(15).create();
+    if (!ex.has('MASTER_CONTROL_TRIGGER_1H_')) ScriptApp.newTrigger('MASTER_CONTROL_TRIGGER_1H_').timeBased().everyHours(1).create();
+    if (!ex.has('DASHBOARD_SYNC_TRIGGER_ENGINE')) ScriptApp.newTrigger('DASHBOARD_SYNC_TRIGGER_ENGINE').timeBased().everyMinutes(30).create();
+    if (!ex.has('SEND_EVENING_MIS_REPORT_'))   ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
+    if (!ex.has('P1_ON_EDIT_INSTALLABLE'))     try { ScriptApp.newTrigger('P1_ON_EDIT_INSTALLABLE').forSpreadsheet(ss).onEdit().create(); } catch(_){}
+    SC_.put('TRIGGER_HEAL_LAST','1',21600);
+    Logger.log('✅ SELF_HEAL_TRIGGERS_ done');
+  } catch(e){ Logger.log('SELF_HEAL warn: '+e.message); }
 }
 
 /**
