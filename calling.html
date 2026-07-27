@@ -570,7 +570,17 @@ function initiateCall() {
   overlay.classList.add("active");
   window.open("tel:" + CURRENT_MOBILE, "_top");
   byId("overlayStatus").innerText = "Dialer opened — save the actual outcome after the call";startCallTimer();
-  if(hasBackend())google.script.run.P1_CALLING_START({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
+  if(hasBackend()) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        console.log('Call start logged:', res);
+      })
+      .withFailureHandler(function(err) {
+        console.error('P1_CALLING_START failed:', err);
+        showToast('Failed to log call start: ' + (err && err.message ? err.message : 'Unknown error'));
+      })
+      .P1_CALLING_START({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
+  }
 }
 
 function startCallTimer() {
