@@ -597,11 +597,16 @@ function init() {
   setIf('source_name', p.get('source'));
   loadLoanData();
   if (isGASConnected()) {
-    google.script.run.withSuccessHandler(function(cfg) {
-      if (cfg && cfg.tcUrl && $('tcLink')) $('tcLink').href = cfg.tcUrl;
-      if (cfg && cfg.privacyUrl && $('privacyLink')) $('privacyLink').href = cfg.privacyUrl;
-      if (cfg) { CONSENT_VERSION=String(cfg.consentVersion||''); PRIVACY_NOTICE_URL=String(cfg.privacyUrl||''); }
-    }).P1_GET_HR_PUBLIC_CONFIG();
+    google.script.run
+      .withSuccessHandler(function(cfg) {
+        if (cfg && cfg.tcUrl && $('tcLink')) $('tcLink').href = cfg.tcUrl;
+        if (cfg && cfg.privacyUrl && $('privacyLink')) $('privacyLink').href = cfg.privacyUrl;
+        if (cfg) { CONSENT_VERSION=String(cfg.consentVersion||''); PRIVACY_NOTICE_URL=String(cfg.privacyUrl||''); }
+      })
+      .withFailureHandler(function(err) {
+        console.error('P1_GET_HR_PUBLIC_CONFIG failed:', err);
+      })
+      .P1_GET_HR_PUBLIC_CONFIG();
     requestUploadToken();
   }
   const df = $('docFiles');
