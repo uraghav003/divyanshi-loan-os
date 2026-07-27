@@ -14,7 +14,26 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+
+      - name: Validate secrets
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          if [ -z "$GOOGLE_CREDENTIALS" ]; then
+            echo "❌ GOOGLE_CREDENTIALS secret is not set."
+            echo "   Go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   Add GOOGLE_CREDENTIALS with your OAuth2 JSON (client_id, client_secret, refresh_token)"
+            exit 1
+          fi
+          if [ -z "$APPS_SCRIPT_ID" ]; then
+            echo "❌ APPS_SCRIPT_ID secret is not set."
+            echo "   Go to: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   Add APPS_SCRIPT_ID with your Google Apps Script project ID"
+            exit 1
+          fi
+          echo "✅ Secrets validated."
 
       - name: Deploy to Apps Script
         env:
