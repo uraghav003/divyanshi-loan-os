@@ -957,9 +957,36 @@ function P1_VERIFY_SESSION_(token) {
   try { const s = JSON.parse(raw); return s.empCode || null; } catch(_) { return null; }
 }
 
+// Staff actions must be bound to a server-issued session. Never trust an
+// employee code supplied by the browser: it is only an assertion, not proof.
+function P1_REQUIRE_STAFF_(p, claimedEmpCode) {
+  p = p || {};
+  const token = String(p.accessToken || p.access_token || p.session_token || p.token || '').trim();
+  const sessionEmpCode = P1_VERIFY_SESSION_(token);
+  if (!sessionEmpCode) throw new Error('A valid staff session is required. Please sign in again.');
+  const emp = FIND_EMPLOYEE_FULL_(sessionEmpCode);
+  if (!emp) throw new Error('Staff account is no longer active.');
+  const claimed = String(claimedEmpCode || p.empCode || p.emp_code || p.agent || '').trim().toUpperCase();
+  if (claimed && claimed !== String(emp.EMP_CODE || '').trim().toUpperCase()) {
+    throw new Error('Employee identity does not match the active session.');
+  }
+  return emp;
+}
+
+function P1_REQUIRE_CASE_ACCESS_(emp, leadId, mobile) {
+  const id = String(leadId || '').trim().toUpperCase();
+  const cleanMobile = DC_CLEAN_MOBILE_(mobile || '');
+  const lead = GET_MASTER_SNAPSHOT_().find(r =>
+    (id && String(r.LEAD_ID || '').trim().toUpperCase() === id) ||
+    (cleanMobile && DC_CLEAN_MOBILE_(r.CLIENT_MOBILE || '') === cleanMobile)
+  );
+  if (lead && !P1_CALLING_CAN_ACCESS_(emp, lead)) throw new Error('You are not assigned to this case.');
+  return lead || null;
+}
+
 function P1_AUTH_EMP_(p) {
-  // 1. Session token (fastest — issued after route-sig auth)
-  const sess = String(p.session_token || p.token || '').trim();
+  // 1. Server-issued session token
+  const sess = String(p.accessToken || p.access_token || p.session_token || p.token || '').trim();
   if (sess) { const code = P1_VERIFY_SESSION_(sess); if (code) return FIND_EMPLOYEE_FULL_(code); }
   // 2. Signed employee route (URL params from P1_DIGITAL_CARD_URL / P1_CALLING_URL etc.)
   const empCode  = String(p.emp_code || p.empCode || '').trim().toUpperCase();
@@ -1195,7 +1222,6 @@ function P1_HANDLE_INTAKE_(p) {
    ================================================================ */
 
 function doGet(e) {
-  try { SELF_HEAL_TRIGGERS_(); } catch(_){}
   const p    = e && e.parameter ? e.parameter : {};
   const page = String(p.page || '').toLowerCase().trim();
   try {
@@ -1468,13 +1494,13 @@ function P1_VERIFY_ACCESS(empCode, pinCode) {
     if (attempts >= 5) return { ok:false, success:false, err:'Too many failed attempts. Try after 5 minutes.', errorMessage:'Too many failed attempts. Try after 5 minutes.' };
     const emp = FIND_EMPLOYEE_FULL_(code);
     const storedPwd = emp ? String(emp.PASSWORD || emp.LOGIN_PASSWORD || '').trim() : '';
-    const valid = !!emp && (storedPwd === '' || storedPwd === pin);
+    const valid = !!emp && !!storedPwd && !!pin && P1_CONST_EQ_(storedPwd, pin);
     if (!valid) {
       SC_.put(attemptKey, String(attempts + 1), 300);
       return { ok:false, success:false, err:'Invalid employee code or PIN', errorMessage:'Invalid employee code or PIN' };
     }
     SC_.remove(attemptKey);
-    const accessToken = 'SESS_' + code + '_' + Date.now().toString(36);
+    const accessToken = P1_ISSUE_SESSION_(code);
     return { ok:true, success:true, accessToken, empCode:code, name:emp.NAME||emp.EMPLOYEES_NAME||'', role:emp.ROLE||'', department:emp.DEPARTMENT||'', email:emp.EMAIL||emp.EMPLOYEE_EMAIL||'', err:'', errorMessage:'' };
   } finally { lock.releaseLock(); }
 }
@@ -1485,8 +1511,9 @@ function P1_VERIFY_ACCESS(empCode, pinCode) {
  */
 function P1_GET_CALLING_QUEUE(p) {
   try {
-    const empCode = typeof p === 'object' ? String((p && (p.empCode || p.emp_code)) || '').trim().toUpperCase() : String(p || '').trim().toUpperCase();
-    const emp = empCode ? FIND_EMPLOYEE_FULL_(empCode) : null;
+    p = p || {};
+    const emp = P1_REQUIRE_STAFF_(p, p.empCode || p.emp_code);
+    if (!P1_ROLE_CAN_USE_CALLING_(emp)) throw new Error('Your role does not have calling workspace access.');
     const snapshot = GET_MASTER_SNAPSHOT_();
 
     const completedSet = { APPROVED: 1, DISBURSED: 1, DISBURSE: 1, COMPLETED: 1, CLOSED: 1, REJECTED: 1 };
@@ -1495,7 +1522,6 @@ function P1_GET_CALLING_QUEUE(p) {
     const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
     const filteredRows = snapshot.filter(r => {
-      if (!emp) return String(r.EMP_CODE || '').toUpperCase() === empCode;
       return P1_CALLING_CAN_ACCESS_(emp, r);
     });
 
@@ -1573,7 +1599,10 @@ function P1_GET_CALLING_QUEUE(p) {
  */
 function P1_CALLING_START(p) {
   try {
+    const emp = P1_REQUIRE_STAFF_(p, p && (p.empCode || p.emp_code));
+    if (!P1_ROLE_CAN_USE_CALLING_(emp)) throw new Error('Your role does not have calling workspace access.');
     const leadId = String((p && p.leadId) || '');
+    P1_REQUIRE_CASE_ACCESS_(emp, leadId, '');
     return { ok: true, success: true, leadId: leadId, startTime: new Date().toISOString() };
   } catch (err) {
     return { ok: false, success: false, err: err.message };
@@ -1588,7 +1617,10 @@ function P1_CALLING_AI_REMARK(p) {
   try {
     p = p || {};
     const leadId = String(p.leadId || p.lead_id || '').trim();
-    const empCode = String(p.empCode || p.emp_code || '').trim().toUpperCase();
+    const emp = P1_REQUIRE_STAFF_(p, p.empCode || p.emp_code);
+    if (!P1_ROLE_CAN_USE_CALLING_(emp)) throw new Error('Your role does not have calling workspace access.');
+    const empCode = String(emp.EMP_CODE || '').trim().toUpperCase();
+    P1_REQUIRE_CASE_ACCESS_(emp, leadId, p.mobile);
     const snapshot = GET_MASTER_SNAPSHOT_();
     const lead = snapshot.find(r => String(r.LEAD_ID || '').toUpperCase() === leadId.toUpperCase() || (r.CLIENT_MOBILE && DC_CLEAN_MOBILE_(r.CLIENT_MOBILE) === DC_CLEAN_MOBILE_(p.mobile)));
 
@@ -1611,6 +1643,9 @@ function P1_CALLING_AI_REMARK(p) {
  */
 function P1_MINI_CRM_UPLOAD(p) {
   try {
+    const emp = P1_REQUIRE_STAFF_(p, p && (p.empCode || p.emp_code));
+    if (!P1_ROLE_CAN_USE_CALLING_(emp)) throw new Error('Your role does not have calling workspace access.');
+    P1_REQUIRE_CASE_ACCESS_(emp, p && (p.leadId || p.lead_id), p && p.mobile);
     const files = (p && p.files) || [];
     return { ok: true, success: true, count: files.length, message: 'Attachments saved successfully' };
   } catch (err) {
@@ -1629,13 +1664,17 @@ function P1_UPDATE_CALLING_CASE(p) {
     const status = String(p.status || p.disposition || '').trim();
     const remarks = String(p.remarks || '').trim();
     const mobile = DC_CLEAN_MOBILE_(p.mobile || p.client_mobile || '');
-    const empCode = String(p.agent || p.empCode || p.emp_code || '').trim().toUpperCase();
+    const emp = P1_REQUIRE_STAFF_(p, p.agent || p.empCode || p.emp_code);
+    if (!P1_ROLE_CAN_USE_CALLING_(emp)) throw new Error('Your role does not have calling workspace access.');
+    const empCode = String(emp.EMP_CODE || '').trim().toUpperCase();
     const durationSec = Number(p.durationSec || 0);
     const now = new Date();
 
     if (!leadId && !mobile) {
       return { ok: false, success: false, err: 'Lead ID or mobile number required for update' };
     }
+
+    P1_REQUIRE_CASE_ACCESS_(emp, leadId, mobile);
 
     let targetLeadId = leadId;
     if (!targetLeadId && mobile) {
@@ -1721,6 +1760,8 @@ function P1_SAVE_CALC_LEAD(p) {
  */
 function P1_VOICE_CALL(p) {
   try {
+    const emp = P1_REQUIRE_STAFF_(p, p && (p.empCode || p.emp_code));
+    P1_REQUIRE_CASE_ACCESS_(emp, p && (p.leadId || p.lead_id), p && p.mobile);
     const mobile = String((p && p.mobile) || '');
     return { ok: true, success: true, message: 'Voice call request initiated for +91' + mobile, status: 'CONNECTED' };
   } catch (err) {
@@ -1746,13 +1787,16 @@ function MLA_UPDATE_MINI_STATUS(p) {
     const mobile = DC_CLEAN_MOBILE_(p.mobile || p.client_mobile || '');
     const status = String(p.status || p.case_category || '').trim();
     const remarks = String(p.remarks || '').trim();
-    const empCode = String(p.empCode || p.agent || '').trim().toUpperCase();
+    const emp = P1_REQUIRE_STAFF_(p, p.empCode || p.agent);
+    const empCode = String(emp.EMP_CODE || '').trim().toUpperCase();
     const leadId = String(p.leadId || p.lead_id || '').trim();
     const now = new Date();
 
     if (!mobile && !leadId) {
       return { ok: false, success: false, errorMessage: 'Mobile number or Lead ID required' };
     }
+
+    P1_REQUIRE_CASE_ACCESS_(emp, leadId, mobile);
 
     let targetLeadId = leadId;
     if (!targetLeadId && mobile) {
@@ -1798,6 +1842,8 @@ function MLA_UPDATE_MINI_STATUS(p) {
  */
 function DC_TG_BROADCAST(message, p) {
   try {
+    const emp = P1_REQUIRE_STAFF_(p, p && (p.empCode || p.emp_code));
+    if (!P1_HAS_MASTER_ACCESS_(emp)) throw new Error('Only master-control users can send broadcasts.');
     const msg = String(message || (p && p.message) || '').trim().slice(0, 4096);
     if (!msg) return { ok:false, success:false, err:'Message empty' };
     const ids = DC_GET_CORE_TG_IDS_();
@@ -1909,6 +1955,9 @@ function SELF_HEAL_TRIGGERS_() {
  */
 function BULBHUL_CHAT_API(data) {
   try {
+    data = data || {};
+    const emp = P1_REQUIRE_STAFF_(data, data.empCode || data.emp_code);
+    data.empCode = emp.EMP_CODE;
     return BULBHUL_CHAT_API_(data);
   } catch (err) {
     return 'Assistant unavailable: ' + (err.message || String(err));
@@ -3398,10 +3447,10 @@ function DC_TG_BROADCAST_(message){
 
 
 // ── P1_GET_STAFF_PUBLIC_DATA_ ──
-function P1_GET_STAFF_PUBLIC_DATA_(empCode){
+function P1_GET_STAFF_PUBLIC_DATA_(p){
   try {
-    empCode=String(empCode||"").trim().toUpperCase();
-    if(!empCode) return null;
+    const requester=P1_REQUIRE_STAFF_(p, p && (p.empCode||p.emp_code));
+    const empCode=String(requester.EMP_CODE||"").trim().toUpperCase();
     const emp=FIND_EMPLOYEE_FULL_(empCode);
     if(!emp) return null;
     const base=P1_GET_EXEC_URL_(),e=encodeURIComponent(empCode);
@@ -3412,9 +3461,10 @@ function P1_GET_STAFF_PUBLIC_DATA_(empCode){
 
 
 // ── P1_GET_STAFF_DASHBOARD_DATA_ ──
-function P1_GET_STAFF_DASHBOARD_DATA_(empCode){
+function P1_GET_STAFF_DASHBOARD_DATA_(p){
   try {
-    empCode=String(empCode||"").trim().toUpperCase();
+    const requester=P1_REQUIRE_STAFF_(p, p && (p.empCode||p.emp_code));
+    const empCode=String(requester.EMP_CODE||"").trim().toUpperCase();
     const emp=empCode?FIND_EMPLOYEE_FULL_(empCode):null;
     let data=[];
     const access=emp?String(emp.DASHBOARD_ACCESS||emp.ROLE||"STAFF").toUpperCase():"STAFF";
@@ -3928,8 +3978,10 @@ function P1_SAVE_CALC_LEAD_(data) { return P1_SAVE_CALC_LEAD(data); }
 
 
 // ── MLA_LOG_ACTIVITY ──
-function MLA_LOG_ACTIVITY(type,mobile){
+function MLA_LOG_ACTIVITY(data){
   try {
+    const emp=P1_REQUIRE_STAFF_(data, data && (data.empCode||data.emp_code));
+    const type=data&&data.type, mobile=data&&data.mobile;
     const sh=GET_OR_CREATE_("AVATAR_ACTIVITY_LOG");
     P1_ENSURE_HEADERS_(sh,["TIMESTAMP","CHAT_ID","USER","ACTION","DETAILS","CHANNEL","EMP_CODE","MOBILE"]);
     sh.appendRow([new Date(),"","EXECUTIVE",type||"ACTIVITY","Executive activity log","WEB_DESK","",DC_CLEAN_MOBILE_(mobile)]);
@@ -3951,7 +4003,11 @@ function P1_SET_TG_WEBHOOK_RUN(){
 
 
 // ── MANAGER_CHECKIN_API ──
-function MANAGER_CHECKIN_API(data){return MANAGER_SELFIE_CHECKIN_(data.empCode,data.half||1);}
+function MANAGER_CHECKIN_API(data){
+  const emp=P1_REQUIRE_STAFF_(data, data&&data.empCode);
+  if(!/MANAGER|HEAD|MD|FOUNDER|ADMIN/.test(String(emp.ROLE||'').toUpperCase())) throw new Error('Manager access is required.');
+  return MANAGER_SELFIE_CHECKIN_(emp.EMP_CODE,(data&&data.half)||1);
+}
 
 
 // ── GET_ACTIVE_LOAN_PRODUCTS ──

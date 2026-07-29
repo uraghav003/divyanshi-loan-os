@@ -78,7 +78,7 @@ with open("appsscript.json", "r") as f:
     files.append({"name": "appsscript", "type": "JSON", "source": f.read()})
 
 for fname in sorted(os.listdir(".")):
-    if fname.endswith(".gs"):
+    if fname.endswith(".gs") and fname not in {"Code_Part1.gs", "Code_Part2.gs", "SETUP_PROPERTIES.gs"}:
         with open(fname, "r") as f:
             files.append({"name": fname[:-3], "type": "SERVER_JS", "source": f.read()})
 

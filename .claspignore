@@ -1,0 +1,13 @@
+# Code.gs is the canonical deployable Apps Script source. The split files are
+# retained only as review archives and must never be uploaded beside it.
+Code_Part1.gs
+Code_Part2.gs
+.github/**
+.agents/**
+AGENTS.md
+ONE_PAGE_SUMMARY.md
+README.md
+SETUP.md
+SETUP_PROPERTIES.gs
+deploy.sh
+setup-github-secrets.sh
