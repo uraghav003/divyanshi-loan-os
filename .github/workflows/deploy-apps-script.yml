@@ -19,10 +19,44 @@ jobs:
       - name: Install clasp
         run: npm install -g @google/clasp
 
-      - name: Authenticate clasp
+      - name: Check secrets are present
         env:
-          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
-        run: echo "$CLASPRC_JSON" > ~/.clasprc.json
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+        run: |
+          echo "CLASP_CLIENT_ID length: ${#CLIENT_ID}"
+          echo "CLASP_CLIENT_SECRET length: ${#CLIENT_SECRET}"
+          echo "CLASP_REFRESH_TOKEN length: ${#REFRESH_TOKEN}"
+          if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$REFRESH_TOKEN" ]; then
+            echo "❌ One or more secrets are missing. Add CLASP_CLIENT_ID, CLASP_CLIENT_SECRET, CLASP_REFRESH_TOKEN in repo Settings → Secrets → Actions."
+            exit 1
+          fi
+          echo "✅ All secrets present."
+
+      - name: Build .clasprc.json
+        env:
+          CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
+        run: |
+          cat > ~/.clasprc.json <<EOF
+          {
+            "token": {
+              "access_token": "",
+              "refresh_token": "${REFRESH_TOKEN}",
+              "scope": "https://www.googleapis.com/auth/script.deployments https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/script.webapp.deploy https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/service.management",
+              "token_type": "Bearer",
+              "expiry_date": 1
+            },
+            "oauth2ClientSettings": {
+              "clientId": "${CLIENT_ID}",
+              "clientSecret": "${CLIENT_SECRET}",
+              "redirectUri": "http://localhost"
+            },
+            "isLocalCreds": false
+          }
+          EOF
 
       - name: Push to Apps Script
         run: clasp push --force
