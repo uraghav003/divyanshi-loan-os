@@ -9,7 +9,7 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..');
 const outputFlag = process.argv.indexOf('--out');
 const outputDir = path.resolve(root, outputFlag >= 0 ? process.argv[outputFlag + 1] : 'artifacts/apps-script');
-const deployFiles = ['appsscript.json', 'Code.gs', 'index.html', 'smart_form.html', 'calling.html', 'voice.html'];
+const deployFiles = ['appsscript.json', 'Code.gs', 'Avatar_Agent_System.gs', 'index.html', 'smart_form.html', 'calling.html', 'voice.html'];
 
 if (outputFlag >= 0 && !process.argv[outputFlag + 1]) throw new Error('--out requires a directory.');
 for (const file of deployFiles) {
