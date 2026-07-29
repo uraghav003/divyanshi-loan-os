@@ -1,0 +1,31 @@
+name: Build Apps Script artifact
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate canonical Apps Script source
+        run: node scripts/build-apps-script-artifact.cjs --out artifacts/apps-script
+
+      - name: Upload Apps Script artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apps-script-source
+          path: artifacts/apps-script
+          if-no-files-found: error

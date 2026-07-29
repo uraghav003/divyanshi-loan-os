@@ -1,8 +1,8 @@
 name: Deploy to Google Apps Script (Jankpuri)
 
 on:
-  push:
-    branches: [main]
+  # Do not force-push to the live project until remote-only source files
+  # (for example Avatar_Agent_System.gs) have been synchronized into Git.
   workflow_dispatch:
 
 jobs:
