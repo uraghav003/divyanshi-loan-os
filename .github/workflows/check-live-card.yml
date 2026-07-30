@@ -5,14 +5,44 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch card page
+      - name: Fetch and decode card page
         run: |
           curl -sL --max-redirs 10 \
             "https://script.google.com/macros/s/AKfycbwFlV0Iq7VcannhtPK7qgl_H1MEvbF7dq0XFRg5tBMkufTqCiQpmgMn4kPS0VB9vZWR/exec?page=card&emp=DC002" \
-            -o response.html -w "\nHTTP_STATUS:%{http_code}\nFINAL_URL:%{url_effective}\n"
-          echo "--- KEY CONTENT ---"
-          grep -oE '(bname|brole|card-bio|Card not found|LOADING|error|avatar|Divyanshi)[^<]{0,80}' response.html | head -30 || true
-          echo "--- BOOT DATA ---"
-          grep -o 'BOOT_DATA[^<]*' response.html | head -5 || true
-          echo "--- FULL SIZE ---"
-          wc -c response.html
+            -o response.html -w "HTTP:%{http_code}\n"
+          python3 - <<'EOF'
+          import html, re, sys
+          with open('response.html') as f:
+              raw = f.read()
+          # Decode HTML entities
+          decoded = html.unescape(raw)
+          # Extract BOOT_DATA JSON
+          m = re.search(r'id="BOOT_DATA"[^>]*>([^<]+)<', decoded)
+          if m:
+              import json
+              try:
+                  boot = json.loads(m.group(1).strip())
+                  s = boot.get('staff') or {}
+                  av = boot.get('avatar') or {}
+                  print('=== STAFF ===')
+                  print('  name:', s.get('name'))
+                  print('  role:', s.get('role'))
+                  print('  mobile:', s.get('mobile'))
+                  print('  whatsapp:', s.get('whatsapp'))
+                  print('  tgChatId:', s.get('tgChatId'))
+                  print('  profilePic:', str(s.get('profilePic',''))[:80])
+                  print('=== AVATAR ===')
+                  print('  ok:', av.get('ok'))
+                  print('  greeting:', str(av.get('greeting',''))[:120])
+                  print('  tagline:', av.get('tagline'))
+                  print('  err:', av.get('err'))
+                  print('=== LINKS ===')
+                  links = av.get('links') or {}
+                  for k,v in links.items(): print(f'  {k}: {v}')
+              except Exception as e:
+                  print('JSON parse error:', e)
+                  print('Raw BOOT_DATA:', m.group(1)[:300])
+          else:
+              print('NO BOOT_DATA FOUND')
+              print('Page snippet:', decoded[:500])
+          EOF
