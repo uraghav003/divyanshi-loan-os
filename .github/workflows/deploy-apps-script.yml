@@ -1,12 +1,15 @@
 name: Deploy to Google Apps Script (Jankpuri)
 
 on:
-  # Do not force-push to the live project until remote-only source files
-  # (for example Avatar_Agent_System.gs) have been synchronized into Git.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy:
+    # The source is complete; deploy automatically once the editor account's
+    # OAuth refresh credentials are configured as the repository secret.
+    if: ${{ secrets.GOOGLE_CREDENTIALS != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
