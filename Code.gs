@@ -2348,6 +2348,82 @@ function P1_ICARD_HANDLER_(payload) {
   } catch (err) { return { ok: false, err: err.message }; }
 }
 
+// ─── CALL START LOG ───────────────────────────────────────────────
+function P1_CALLING_START(payload) {
+  try {
+    payload = payload || {};
+    const code = String(payload.empCode || "").trim().toUpperCase();
+    const leadId = String(payload.leadId || "").trim();
+    if (!code) return { ok: false, err: "empCode required" };
+    const s = GET_OR_CREATE_("CALL_LOG");
+    P1_ENSURE_HEADERS_(s, ["TIMESTAMP", "EMP_CODE", "LEAD_ID", "ACCESS_TOKEN"]);
+    s.appendRow([new Date(), code, leadId, String(payload.accessToken || "")]);
+    return { ok: true };
+  } catch (err) { LOG_ERR_("P1_CALLING_START", "", err.message); return { ok: false, err: err.message }; }
+}
+
+// ─── UPLOAD TOKEN ISSUE ────────────────────────────────────────────
+function P1_ISSUE_UPLOAD_TOKEN(submissionKey, route) {
+  try {
+    const key = String(submissionKey || "").trim();
+    if (!key) throw new Error("submissionKey required");
+    const token = Utilities.base64Encode(key + "_" + Date.now() + "_" + Math.random()).replace(/[^A-Za-z0-9]/g, "").slice(0, 32);
+    CacheService.getScriptCache().put("UPLOAD_TOKEN_" + token, JSON.stringify({ key: key, route: String(route || "") }), 1800);
+    return token;
+  } catch (err) { LOG_ERR_("P1_ISSUE_UPLOAD_TOKEN", "", err.message); throw err; }
+}
+
+// ─── CASE FILE UPLOAD ──────────────────────────────────────────────
+function P1_MINI_CRM_UPLOAD(payload) {
+  try {
+    payload = payload || {};
+    const code = String(payload.empCode || "").trim().toUpperCase();
+    const leadId = String(payload.leadId || "").trim();
+    const files = Array.isArray(payload.files) ? payload.files : [];
+    if (!code) return { ok: false, err: "empCode required" };
+    if (!leadId) return { ok: false, err: "leadId required" };
+    if (!files.length) return { ok: true, skipped: true };
+
+    const parentId = PropertiesService.getScriptProperties().getProperty("CLIENT_DOCS_FOLDER_ID");
+    if (!parentId) return { ok: false, err: "CLIENT_DOCS_FOLDER_ID not configured" };
+    const parent = DriveApp.getFolderById(parentId);
+    const existing = parent.getFoldersByName(leadId);
+    const folder = existing.hasNext() ? existing.next() : parent.createFolder(leadId);
+
+    const links = [];
+    files.forEach(f => {
+      if (!f || !f.base64) return;
+      const bytes = Utilities.base64Decode(String(f.base64).split(",").pop());
+      const blob = Utilities.newBlob(bytes, f.mimeType || "application/octet-stream", f.name || ("file_" + Date.now()));
+      const file = folder.createFile(blob);
+      links.push(file.getUrl());
+    });
+
+    const s = GET_OR_CREATE_("CASE_FILES_LOG");
+    P1_ENSURE_HEADERS_(s, ["TIMESTAMP", "EMP_CODE", "LEAD_ID", "REMARKS", "FILE_LINKS"]);
+    s.appendRow([new Date(), code, leadId, String(payload.remarks || ""), links.join(", ")]);
+
+    try {
+      const master = SHEET_("MASTER_DATA");
+      if (master && master.getLastRow() >= 2) {
+        const h = master.getRange(1, 1, 1, master.getLastColumn()).getValues()[0].map(DC_NORM_);
+        const li = h.indexOf("LEAD_ID"), di = h.indexOf("DOCS_LINK");
+        if (li > -1 && di > -1) {
+          const ids = master.getRange(2, li + 1, master.getLastRow() - 1, 1).getValues();
+          for (let i = 0; i < ids.length; i++) {
+            if (String(ids[i][0] || "").trim().toUpperCase() === leadId.toUpperCase()) {
+              master.getRange(i + 2, di + 1).setValue(folder.getUrl());
+              break;
+            }
+          }
+        }
+      }
+    } catch (linkErr) { LOG_ERR_("P1_MINI_CRM_UPLOAD_LINK", leadId, linkErr.message); }
+
+    return { ok: true, folderUrl: folder.getUrl(), files: links };
+  } catch (err) { LOG_ERR_("P1_MINI_CRM_UPLOAD", "", err.message); return { ok: false, err: err.message }; }
+}
+
 /**
  * MALLIK TRIGGER STABILISER v2 – 2026-07-30
  * Latest safe technique: collect → delete (never mutate while iterating)
