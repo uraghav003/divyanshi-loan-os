@@ -163,7 +163,29 @@
   <!-- BOOT DATA: injected as JSON by doGet — safe application/json type, no XSS risk -->
   <script id="BOOT_DATA" type="application/json">__P1_BOOT_DATA_JSON__</script>
 
-  <div id="app"></div>
+  <div id="app" aria-live="polite">
+    <main style="min-height:70vh;display:grid;place-items:center;padding:32px;background:#f8fafc">
+      <section style="max-width:460px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:32px;box-shadow:0 12px 30px rgba(0,0,0,.06)">
+        <h1 style="margin:0;color:#0B1F3A;font-size:28px">Divyanshi Capital</h1>
+        <p style="margin:12px 0 0;color:#475569">Loading your secure loan services…</p>
+      </section>
+    </main>
+  </div>
+  <noscript><div style="padding:24px;font-family:Arial;color:#0B1F3A">JavaScript is required to use Divyanshi Capital online services.</div></noscript>
+
+  <script>
+    // A browser policy, extension, or unexpected client error must never leave
+    // the public Web App as a blank white page.
+    (function () {
+      function showStartupError() {
+        var root = document.getElementById('app');
+        if (!root) return;
+        root.innerHTML = '<main style="min-height:70vh;display:grid;place-items:center;padding:32px;background:#f8fafc"><section style="max-width:460px;text-align:center;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:32px;box-shadow:0 12px 30px rgba(0,0,0,.06)"><h1 style="margin:0;color:#0B1F3A;font-size:28px">Divyanshi Capital</h1><p style="margin:12px 0;color:#475569">The portal could not finish loading.</p><button type="button" onclick="location.reload()" style="border:0;border-radius:10px;background:#C9A84C;padding:11px 18px;font-weight:700;cursor:pointer">Reload portal</button></section></main>';
+      }
+      window.addEventListener('error', showStartupError);
+      window.addEventListener('unhandledrejection', showStartupError);
+    }());
+  </script>
 
   <!-- Floating Bulbhul AI -->
   <div class="bulbhul-btn" id="bulbhulBtn" onclick="toggleChat()" title="Bulbhul AI Banker">💬</div>
