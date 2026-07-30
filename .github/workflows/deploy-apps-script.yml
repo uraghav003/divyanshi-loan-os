@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+      CLASP_CLIENT_ID: ${{ secrets.CLASP_CLIENT_ID }}
+      CLASP_CLIENT_SECRET: ${{ secrets.CLASP_CLIENT_SECRET }}
+      CLASP_REFRESH_TOKEN: ${{ secrets.CLASP_REFRESH_TOKEN }}
     steps:
       - uses: actions/checkout@v6
 
@@ -39,29 +42,41 @@ jobs:
           node <<'NODE'
           const fs = require('fs');
           const os = require('os');
-          let credentials;
-          try { credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS || ''); }
-          catch (_) { throw new Error('GOOGLE_CREDENTIALS must contain valid JSON.'); }
-          for (const field of ['client_id', 'client_secret', 'refresh_token']) {
-            if (!credentials[field]) throw new Error(`GOOGLE_CREDENTIALS is missing ${field}.`);
+          let credentials = {};
+          
+          if (process.env.GOOGLE_CREDENTIALS) {
+            try { 
+              credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS); 
+            } catch (e) {
+              console.error('Error parsing GOOGLE_CREDENTIALS JSON. Using fallback variables if available.');
+            }
           }
+          
+          const clientId = credentials.client_id || process.env.CLASP_CLIENT_ID;
+          const clientSecret = credentials.client_secret || process.env.CLASP_CLIENT_SECRET;
+          const refreshToken = credentials.refresh_token || process.env.CLASP_REFRESH_TOKEN;
+          
+          if (!clientId || !clientSecret || !refreshToken) {
+            throw new Error('Missing authentication credentials. Please provide GOOGLE_CREDENTIALS JSON or individual CLASP_CLIENT_ID, CLASP_CLIENT_SECRET, and CLASP_REFRESH_TOKEN secrets.');
+          }
+          
           const clasp = {
             token: {
               access_token: '',
-              refresh_token: credentials.refresh_token,
+              refresh_token: refreshToken,
               scope: 'https://www.googleapis.com/auth/script.deployments https://www.googleapis.com/auth/script.projects https://www.googleapis.com/auth/script.webapp.deploy https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/service.management',
               token_type: 'Bearer',
               expiry_date: 1
             },
             oauth2ClientSettings: {
-              clientId: credentials.client_id,
-              clientSecret: credentials.client_secret,
+              clientId: clientId,
+              clientSecret: clientSecret,
               redirectUri: 'http://localhost'
             },
             isLocalCreds: false
           };
           fs.writeFileSync(`${os.homedir()}/.clasprc.json`, JSON.stringify(clasp));
-          console.log('Clasp credentials configured.');
+          console.log('Clasp credentials successfully configured.');
           NODE
 
       - name: Push to Apps Script
