@@ -1651,14 +1651,35 @@ function P1_MAP_HTML_LINKS_() {
 }
 
 const P1_EMPLOYEE_CORE_FIELDS_=['EMP_CODE','EMPLOYEES_NAME','ROLE','DEPARTMENT','EMPLOYEE_EMAIL_ID','MOBILE','MANAGER_EMAIL_ID'];
+const P1_PASSWORD_CONTROL_COLS_=['PASSWORD_RESET_INPUT','PASSWORD_STATUS','PASSWORD_CHANGED_AT'];
 
-function P1_EMPLOYEE_HEADERS_(){ return P1_TAB_MAP.ALL_EMPLOYEES().concat(AVATAR_SOCIAL_COLS_); }
+function P1_EMPLOYEE_HEADERS_(){ return P1_TAB_MAP.ALL_EMPLOYEES().concat(AVATAR_SOCIAL_COLS_,P1_PASSWORD_CONTROL_COLS_); }
+
+/* HR/master-only reset control. The entered password is hashed in Script
+ * Properties and the sheet cell is immediately cleared; passwords are never
+ * retained or displayed in ALL_EMPLOYEES. Protect this column in Sheets. */
+function P1_PROCESS_EMPLOYEE_PASSWORD_RESET_(sh,row,headers) {
+  const h=headers.map(DC_NORM_), idx=n=>h.indexOf(DC_NORM_(n));
+  const code=String(sh.getRange(row,idx('EMP_CODE')+1).getValue()||'').trim().toUpperCase();
+  const inputIndex=idx('PASSWORD_RESET_INPUT'), statusIndex=idx('PASSWORD_STATUS'), changedIndex=idx('PASSWORD_CHANGED_AT');
+  if(!code||inputIndex<0||statusIndex<0||changedIndex<0)return;
+  const inputCell=sh.getRange(row,inputIndex+1), password=String(inputCell.getValue()||'');
+  if(!password)return;
+  inputCell.clearContent();
+  if(password.length<8||password.length>64){sh.getRange(row,statusIndex+1).setValue('RESET_REJECTED: 8–64 characters required');return;}
+  const props=PropertiesService.getScriptProperties(),salt=Utilities.getUuid();
+  props.setProperties({['PIN_HASH_'+code]:P1_PIN_DIGEST_(code,password,salt),['PIN_SALT_'+code]:salt});
+  props.deleteProperty('PIN_'+code); SC_.remove(P1_AUTH_FAILURE_KEY_(code));
+  sh.getRange(row,statusIndex+1).setValue('PASSWORD_SET');
+  sh.getRange(row,changedIndex+1).setValue(new Date());
+}
 
 /* Idempotent schema + per-row employee link provisioning. It never creates a
    Telegram or WhatsApp identity: those require a separately verified channel. */
 function P1_SYNC_EMPLOYEE_ROW_(sh,row) {
   const headers=P1_ENSURE_HEADERS_(sh,P1_EMPLOYEE_HEADERS_());
   if(row<2) return {ok:false,err:'Header row'};
+  P1_PROCESS_EMPLOYEE_PASSWORD_RESET_(sh,row,headers);
   const h=headers.map(DC_NORM_), idx=n=>h.indexOf(DC_NORM_(n));
   const values=sh.getRange(row,1,1,headers.length).getValues()[0];
   const read=n=>String(values[idx(n)]||'').trim();
