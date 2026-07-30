@@ -1800,7 +1800,7 @@ function doGet(e) {
     const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),dashboard:page==='dashboard'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token)?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
     html=html.split('__P1_BOOT_DATA_JSON__').join(JSON.stringify(bootData).replace(/</g,'\\u003c'));
-    return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital AI Based OS').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
+    return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital AI Based OS').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch(err){ const ref='ERR_'+Date.now();LOG_ERR_('doGet',ref,err.message); return HtmlService.createHtmlOutput(`<div style="font-family:Arial;padding:40px"><h2 style="color:#dc2626">Page unavailable</h2><p>Please retry or contact support. Reference: ${ref}</p></div>`); }
 }
 
