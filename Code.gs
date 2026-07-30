@@ -1029,6 +1029,57 @@ function DC_SEND_RCS_SINGLE_(mobile, data, cfg) {
     return false;
   }
 }
+function SEND_TG_LEAD_ALERT_(lead, emp) {
+  try {
+    lead = lead || {};
+    const name = emp ? emp.NAME : (lead.SALES_NAME || 'Unassigned');
+    const code = lead.EMP_CODE || '—';
+    const amt  = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
+    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
+    const msg =
+      `🆕 *NEW LEAD*\n` +
+      `📋 ID: ${lead.LEAD_ID || 'N/A'}\n` +
+      `👤 ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
+      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
+      `🏦 ${lead.PREFERRED_BANK || 'N/A'} | ⏱ TAT: ${lead.TAT_DAYS || 7}d\n` +
+      `👔 Owner: ${name} (${code})\n` +
+      `📌 ${String(lead.REMARKS || 'No remarks').slice(0, 120)}`;
+    DC_SEND_TG_(msg);
+  } catch (e) { LOG_ERR_('SEND_TG_LEAD_ALERT', (lead && lead.LEAD_ID) || '', e.message); }
+}
+
+function NOTIFY_ACCOUNTS_ON_DISBURSE_(lead) {
+  try {
+    lead = lead || {};
+    const amt = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
+    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
+    const msg =
+      `✅ *DISBURSAL COMPLETE*\n` +
+      `📋 Lead: ${lead.LEAD_ID || 'N/A'}\n` +
+      `👤 Client: ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
+      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
+      `🏦 Bank: ${lead.PREFERRED_BANK || 'N/A'}\n` +
+      `👔 Owner: ${lead.SALES_NAME || 'N/A'} (${lead.EMP_CODE || '—'})`;
+
+    // Log to ACCOUNTS_LOG sheet
+    const sh = GET_OR_CREATE_('ACCOUNTS_LOG');
+    P1_ENSURE_HEADERS_(sh, P1_TAB_MAP.ACCOUNTS_LOG());
+    sh.appendRow(P1_BUILD_ROW_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_).map((_,i)=>sh.getRange(1,i+1).getValue()), lead));
+
+    // Notify via TG
+    const tgToken = DC_CFG.TG_TOKEN;
+    const acctId = PropertiesService.getScriptProperties().getProperty('ACCOUNTS_TG_CHAT_ID') || '';
+    if (tgToken && acctId) DC_SEND_TG_MESSAGE_(acctId, msg);
+    else DC_SEND_TG_(msg);
+
+    // Notify accounts email
+    if (MailApp.getRemainingDailyQuota() > 0) {
+      MailApp.sendEmail(DC_CFG.COMPANY.ACCOUNTS_EMAIL, `[DISBURSAL] ${lead.LEAD_ID || ''} — ${lead.CLIENT_NAME || ''}`,
+        `Disbursal logged.\n\nLead: ${lead.LEAD_ID}\nClient: ${lead.CLIENT_NAME} | ${lead.CLIENT_MOBILE}\nLoan: ${lead.LOAN_TYPE} | ${amtStr}\nBank: ${lead.PREFERRED_BANK}\nOwner: ${lead.SALES_NAME} (${lead.EMP_CODE})\n\n— Bulbhul AI`);
+    }
+  } catch (e) { LOG_ERR_('NOTIFY_ACCOUNTS_ON_DISBURSE', (lead && lead.LEAD_ID) || '', e.message); }
+}
+
 /* ================================================================
    SECTION 14 — MESSAGING SERVICES
    ================================================================ */
@@ -1259,7 +1310,7 @@ function P1_GET_STAFF_PUBLIC_DATA_(empCode) {
     const base=P1_GET_EXEC_URL_(),e=encodeURIComponent(empCode);
     const avatar=emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(emp.NAME||empCode)}&background=d4af37&color=0a2540&size=160`;
     const at=encodeURIComponent(P1_MINT_ACCESS_TOKEN_(empCode));
-    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
+    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',whatsapp:emp.WHATSAPP||emp.MOBILE||'',tgChatId:emp.TG_CHAT_ID||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
   } catch(e){ LOG_ERR_('P1_GET_STAFF_PUBLIC_DATA',empCode,e.message); return null; }
 }
 
