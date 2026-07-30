@@ -1,0 +1,18 @@
+name: Check Live Card Page
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch card page
+        run: |
+          curl -sL --max-redirs 10 \
+            "https://script.google.com/macros/s/AKfycbwFlV0Iq7VcannhtPK7qgl_H1MEvbF7dq0XFRg5tBMkufTqCiQpmgMn4kPS0VB9vZWR/exec?page=card&emp=DC002" \
+            -o response.html -w "\nHTTP_STATUS:%{http_code}\nFINAL_URL:%{url_effective}\n"
+          echo "--- KEY CONTENT ---"
+          grep -oE '(bname|brole|card-bio|Card not found|LOADING|error|avatar|Divyanshi)[^<]{0,80}' response.html | head -30 || true
+          echo "--- BOOT DATA ---"
+          grep -o 'BOOT_DATA[^<]*' response.html | head -5 || true
+          echo "--- FULL SIZE ---"
+          wc -c response.html
