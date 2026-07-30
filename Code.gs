@@ -192,7 +192,6 @@ function GET_OR_CREATE_(name) {
   return newSh;
 }
 
-function P1_GET_OR_CREATE_SHEET_(name) { return GET_OR_CREATE_(name); }
 
 function P1_OPEN_SS_SAFE_(fileId) {
   for (let i = 1; i <= 2; i++) {   // reduced to 2 retries (was 3)
@@ -703,7 +702,6 @@ function DC_PROCESS_LEAD_(lead) {
     // Stage 4: AI credit analysis
     let aiAdvice='';
     try {
-      let ctx = "[LIVE PRODUCTS]:\n";
       const aiPrompt='[LEAD]\n'+JSON.stringify({name:lead.CLIENT_NAME,mobile:lead.CLIENT_MOBILE,loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,emp:lead.EMP_CODE,remarks:lead.REMARKS},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
       const aiSys=BULBHUL_SYS_BASE_+'\n\nTask: Credit analysis. 4 sections:\n#### CIBIL Requirements:\n#### Matching Banks:\n#### Red Flags:\n#### Next Steps:';
       aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys);
@@ -936,14 +934,14 @@ td.value{color:#111;font-weight:500}
     // ── 2. TELEGRAM ──
     try {
       const tgMsg = `🆕 *NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━━━━━━━\n🪪 *Lead ID:* ${lead.LEAD_ID || 'N/A'}\n👤 *Client:* ${lead.CLIENT_NAME || 'N/A'}\n📱 *Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n💳 *Loan:* ${lead.LOAN_TYPE || 'N/A'}\n💰 *Amount:* ${amountDisplay}\n🏦 *Bank:* ${bank}\n⏱ *TAT:* ${tatDays} days\n⚠ *Deadline:* ${fmtDeadline}\n👔 *Owner:* ${ownerName} (${ownerCode})\n📋 *Remarks:* ${String(lead.REMARKS || 'No remarks').slice(0,120)}\n━━━━━━━━━━━━━━━━━━━━\n🤖 *Bulbhul AI:*\n${aiText.slice(0,350)}`;
-      if (typeof DC_SEND_TG_ === 'function') DC_SEND_TG_(tgMsg);
+      DC_SEND_TG_(tgMsg);
     } catch (e) { LOG_ERR_('NOTIFY_TG', lead.LEAD_ID || '', e.message); }
 
     // ── 3. WHATSAPP ──
     try {
       if (emp && emp.WHATSAPP && String(emp.WHATSAPP_VERIFIED || '').toUpperCase() === 'YES') {
         const waMsg = `*NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━\n*Lead ID:* ${lead.LEAD_ID || 'N/A'}\n*Client:* ${lead.CLIENT_NAME || 'N/A'}\n*Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n*Loan:* ${lead.LOAN_TYPE || 'N/A'}\n*Amount:* ${amountDisplay}\n*Bank:* ${bank}\n*TAT:* ${tatDays} days\n*Deadline:* ${fmtDeadline}\n*Owner:* ${ownerName} (${ownerCode})\n━━━━━━━━━━━━━━\n*Bulbhul:* ${aiText.slice(0,200)}`;
-        if (typeof DC_SEND_WA_ === 'function') DC_SEND_WA_(emp.WHATSAPP, waMsg);
+        DC_SEND_WA_(emp.WHATSAPP, waMsg);
       }
     } catch (e) { LOG_ERR_('NOTIFY_WA', lead.LEAD_ID || '', e.message); }
 
@@ -1064,7 +1062,7 @@ function NOTIFY_ACCOUNTS_ON_DISBURSE_(lead) {
     // Log to ACCOUNTS_LOG sheet
     const sh = GET_OR_CREATE_('ACCOUNTS_LOG');
     P1_ENSURE_HEADERS_(sh, P1_TAB_MAP.ACCOUNTS_LOG());
-    sh.appendRow(P1_BUILD_ROW_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_).map((_,i)=>sh.getRange(1,i+1).getValue()), lead));
+    sh.appendRow(P1_BUILD_ROW_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_), lead));
 
     // Notify via TG
     const tgToken = DC_CFG.TG_TOKEN;
@@ -1380,7 +1378,7 @@ function onEdit(e) {
     if(name==='HR_MD_APPROVAL'){
       try {
         const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
-        const iS=h.indexOf('CASE_CATEGORY'),iE=h.indexOf('EMP_CODE'),iO=h.indexOf('ONBOARD_DONE');
+        const iS=h.indexOf('STATUS'),iE=h.indexOf('EMP_CODE'),iO=h.indexOf('ONBOARD_DONE');
         if(col===iS+1){
           const st=String(sh.getRange(row,iS+1).getValue()||'').toUpperCase();
           const ec=String(iE>-1?sh.getRange(row,iE+1).getValue():'').toUpperCase();
@@ -2366,8 +2364,6 @@ function INSTALL_AVATAR_SOCIAL_SCHEMA_() {
   return 'AVATAR_SCHEMA_OK';
 }
 
-/* ── SYNC_ROLE_DASHBOARDS_ENGINE — legacy compatibility alias ── */
-function SYNC_ROLE_DASHBOARDS_ENGINE() { MIS_15MIN_FULL_SYNC_(); }
 
 /* ================================================================
    SECTION 25 — FRONTEND API SURFACE
