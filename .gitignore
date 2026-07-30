@@ -1,0 +1,16 @@
+# Apps Script / clasp local credentials and deployment metadata
+.clasp.json
+.clasprc.json
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+credentials.json
+service-account*.json
+client_secret*.json
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.vscode/
