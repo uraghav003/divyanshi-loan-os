@@ -135,6 +135,12 @@ const DC_CFG = {
   get META_WA_TOKEN()    { return String(PropertiesService.getScriptProperties().getProperty('META_WA_TOKEN')||'').trim(); },
   get META_WA_PHONE_ID() { return String(PropertiesService.getScriptProperties().getProperty('META_WA_PHONE_ID')||'').trim(); },
   get API_KEY()          { return String(PropertiesService.getScriptProperties().getProperty('MALLIK_API_KEY')||'').trim(); },
+  // The account that publishes/manages the connected AI Studio integration.
+  // Keep this separate from COMPANY.MD_EMAIL: publishing access is not a
+  // business-approval role and may be held by a different Google account.
+  get AI_STUDIO_PUBLISHER_EMAIL() {
+    return String(PropertiesService.getScriptProperties().getProperty('AI_STUDIO_PUBLISHER_EMAIL')||'').trim().toLowerCase();
+  },
   COMPANY: {
     NAME:           'Divyanshi Capital Pvt Ltd',
     MD_EMAIL:       'upendra.raghav@divyanshicapital.com',
@@ -1287,6 +1293,7 @@ function doPost(e) {
       case 'health_check':
         return out({ok:true, ts:new Date().toISOString(),
           aiKeys:[DC_CFG.DEEPSEEK_KEY,DC_CFG.OPENAI_KEY,DC_CFG.GEMINI_KEY].filter(Boolean).length,
+          aiStudioPublisherConfigured: !!DC_CFG.AI_STUDIO_PUBLISHER_EMAIL,
           version:'V9.4.0-MERGED'});
 
       case 'chat':
@@ -1432,7 +1439,7 @@ function technicalFixes() {
   const props   = PropertiesService.getScriptProperties().getProperties();
   const required = ['MALLIK_API_KEY','PRIVACY_NOTICE_URL','CONSENT_VERSION',
     'PRIVACY_CONTACT_EMAIL','GRIEVANCE_OFFICER_NAME','HR_TC_URL',
-    'COMPANY_WEBSITE_URL','CLIENT_DOCS_FOLDER_ID'];
+    'COMPANY_WEBSITE_URL','CLIENT_DOCS_FOLDER_ID','AI_STUDIO_PUBLISHER_EMAIL'];
   const missing = required.filter(k => !props[k]);
   const present = required.filter(k => !!props[k]);
   Logger.log('✅ Configured: ' + (present.join(', ')||'(none)'));

@@ -34,6 +34,7 @@ This folder is the only canonical Apps Script source. Older files and ZIPs outsi
 8. Configure HR/branding/document properties listed by `technicalFixes()` as required.
 9. In AI Studio, keep the existing project and use a server-side proxy to the Apps Script endpoint.
 10. If Telegram is enabled, configure `TG_WEBHOOK_SECRET` and explicit `*_TG_CHAT_ID` plus `*_TG_EMP_CODE` mappings; `/core` self-registration is intentionally disabled. Built-in `DocumentApp` is used for candidate resumes; Advanced Google Docs API is not required.
+11. Set `AI_STUDIO_PUBLISHER_EMAIL` to the Google account that publishes the AI Studio integration. For this project it is `u.raghav003@gmail.com`. This is deliberately separate from the MD email, which remains the business approval address. See `apps-script-properties.example.json` for the non-secret configuration format.
 
 ## Acceptance checks
 
