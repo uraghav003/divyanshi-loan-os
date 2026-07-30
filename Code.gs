@@ -1464,9 +1464,10 @@ function DC_INSTALL_P1_FINAL_() {
     P1_ENSURE_HEADERS_(snSh,P1_TAB_MAP.SOURCE_NAME());
     snSh.getRange(2,1,17,2).setValues([['Sales Team','SALES'],['Manual Calling','SALES'],['AI Auto Calling','SALES'],['WhatsApp','SALES'],['Website','SALES'],['Referral','SALES'],['Walk-in','SALES'],['Instagram','SALES'],['Facebook','SALES'],['LinkedIn','SALES'],['Email Campaign','SALES'],['Bank Referral','SALES'],['GoDial Auto Calling','SALES'],['DSA','LOGIN DEPARTMENT'],['Send to Login','LOGIN DEPARTMENT'],['MIS-Incoming','REPORT'],['ONBOARD','HR']]);
   }
-  const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','onEdit','P1_FORM_SUBMIT'];
+  const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','WARM_CACHE_','onEdit','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('WARM_CACHE_').timeBased().everyMinutes(8).create();
   ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
   ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
   try{ScriptApp.newTrigger('onEdit').forSpreadsheet(ss).onEdit().create();}catch(_){}
@@ -1584,6 +1585,7 @@ function doPost(e) {
     if (action === 'update_lead')      return jsonResp_(UPDATE_LEAD_STATUS_(payload.query, payload.status, payload.remark));
     if (action === 'run_mis')          { MIS_PIPELINE_RUN_(); return jsonResp_({ ok: true, msg: 'MIS triggered' }); }
     if (action === 'clear_cache')      { INVALIDATE_ALL_CACHES_(); return jsonResp_({ ok: true, msg: 'All caches cleared' }); }
+    if (action === 'sync_emp_links')   { const r=P1_MAP_HTML_LINKS_(); return jsonResp_({ ok: true, msg: r }); }
     if (action === 'get_avatar_profile') return jsonResp_(P1_GET_AVATAR_PROFILE_(payload.empCode));
     if (action === 'generate_post')    return jsonResp_(GENERATE_LOAN_POST_(payload.empCode, payload.loanType, payload.sourceName, payload.customMsg));
     if (action === 'post_facebook')    return jsonResp_(POST_TO_FACEBOOK_(payload.empCode, payload.message, payload.imageUrl));
@@ -1614,6 +1616,14 @@ function MANAGER_CHECKIN_API(d)       { return MANAGER_SELFIE_CHECKIN_(d.empCode
 function RUN_MIS_PIPELINE_NOW()       { MIS_PIPELINE_RUN_(); }
 function RUN_MIS_EVENING_REPORT()     { SEND_EVENING_MIS_REPORT_(); }
 function CLEAR_CACHE_NOW()            { INVALIDATE_ALL_CACHES_(); Logger.log('✅ All caches cleared'); }
+function SYNC_ALL_EMP_LINKS()         { return P1_MAP_HTML_LINKS_(); }
+
+// Pre-warms ScriptCache every 8 min so doGet cold-start is <1s
+function WARM_CACHE_() {
+  try { DC_BUILD_EMP_MAP_(); } catch(_){}
+  try { GET_ACTIVE_LOAN_PRODUCTS_(); } catch(_){}
+  try { P1_GET_BANK_OPTIONS_MAP_(); } catch(_){}
+}
 
 function P1_MAP_HTML_LINKS_() {
   const sh = SHEET_('ALL_EMPLOYEES');
@@ -1623,56 +1633,77 @@ function P1_MAP_HTML_LINKS_() {
 
   const headers = data[0].map(DC_NORM_);
   const base = P1_GET_EXEC_URL_();
+  const now = new Date();
 
-  function ensureCol(name) {
+  // Ensure all 9 link columns exist; creates them if missing (single API call per missing col)
+  const COL_NAMES = [
+    'P1_WEBSITE_URL','P1_SMART_FORM_URL','P1_DIGITAL_CARD_URL',
+    'P1_DASHBOARD_URL','P1_CALLING_URL','P1_VOICE_URL',
+    'P1_AVATAR_URL','P1_SYNC_STATUS','P1_LAST_SYNC_AT'
+  ];
+  const colIdx = {};
+  COL_NAMES.forEach(name => {
     const norm = DC_NORM_(name);
     let i = headers.indexOf(norm);
     if (i === -1) {
-      const newCol = sh.getLastColumn() + 1;
-      sh.getRange(1, newCol).setValue(name);
-      i = newCol - 1;
+      i = sh.getLastColumn(); // 0-based after append
+      sh.getRange(1, i + 1).setValue(name);
       headers.push(norm);
     }
-    return i;
-  }
+    colIdx[name] = i; // 0-based
+  });
 
   const iCode = headers.indexOf(DC_NORM_('EMP_CODE'));
   const iName = headers.indexOf(DC_NORM_('EMPLOYEES_NAME'));
   if (iCode === -1) throw new Error('EMP_CODE column missing in ALL_EMPLOYEES');
 
-  const p1Cols = {
-    web: ensureCol('P1_WEBSITE_URL'),
-    form: ensureCol('P1_SMART_FORM_URL'),
-    dash: ensureCol('P1_DASHBOARD_URL'),
-    call: ensureCol('P1_CALLING_URL'),
-    avt: ensureCol('P1_AVATAR_URL'),
-    sync: ensureCol('P1_SYNC_STATUS'),
-    at: ensureCol('P1_LAST_SYNC_AT')
-  };
+  // Build per-column arrays for batch write — one setFormulas() call per column
+  const totalCols = headers.length;
+  const nRows = data.length - 1; // data rows (excludes header)
+
+  // Collect row-level values per column
+  const colData = {}; // colName -> array[nRows] of value/formula
+  COL_NAMES.forEach(n => { colData[n] = new Array(nRows).fill(''); });
 
   let updated = 0;
   for (let i = 1; i < data.length; i++) {
     const code = String(data[i][iCode] || '').trim().toUpperCase();
-    if (!code) continue;
+    const ri = i - 1; // row index in colData arrays
+    if (!code) { COL_NAMES.forEach(n => { colData[n][ri] = ''; }); continue; }
+
     const name = String(iName > -1 ? data[i][iName] : code).trim() || code;
     const e = encodeURIComponent(code);
     const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=160`;
-    const row = i + 1;
 
-    sh.getRange(row, p1Cols.web + 1).setFormula(`=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`);
-    sh.getRange(row, p1Cols.form + 1).setFormula(`=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`);
-    sh.getRange(row, p1Cols.dash + 1).setFormula(`=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`);
-    sh.getRange(row, p1Cols.call + 1).setFormula(`=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`);
-    sh.getRange(row, p1Cols.avt + 1).setValue(avatar);
-    sh.getRange(row, p1Cols.sync + 1).setValue('CONNECTED');
-    sh.getRange(row, p1Cols.at + 1).setValue(new Date());
+    colData['P1_WEBSITE_URL'][ri]     = `=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`;
+    colData['P1_SMART_FORM_URL'][ri]  = `=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`;
+    colData['P1_DIGITAL_CARD_URL'][ri]= `=HYPERLINK("${base}?page=card&emp=${e}","🪪 Card")`;
+    colData['P1_DASHBOARD_URL'][ri]   = `=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`;
+    colData['P1_CALLING_URL'][ri]     = `=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`;
+    colData['P1_VOICE_URL'][ri]       = `=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`;
+    colData['P1_AVATAR_URL'][ri]      = avatar;
+    colData['P1_SYNC_STATUS'][ri]     = 'CONNECTED';
+    colData['P1_LAST_SYNC_AT'][ri]    = now;
     updated++;
   }
 
+  // Batch write: one setFormulas()/setValues() call per column instead of per cell
+  const FORMULA_COLS = ['P1_WEBSITE_URL','P1_SMART_FORM_URL','P1_DIGITAL_CARD_URL','P1_DASHBOARD_URL','P1_CALLING_URL','P1_VOICE_URL'];
+  const VALUE_COLS   = ['P1_AVATAR_URL','P1_SYNC_STATUS','P1_LAST_SYNC_AT'];
+
+  FORMULA_COLS.forEach(name => {
+    const col = colIdx[name] + 1; // 1-based
+    sh.getRange(2, col, nRows, 1).setFormulas(colData[name].map(v => [v]));
+  });
+  VALUE_COLS.forEach(name => {
+    const col = colIdx[name] + 1;
+    sh.getRange(2, col, nRows, 1).setValues(colData[name].map(v => [v]));
+  });
+
   INVALIDATE_ALL_CACHES_();
   styleHeaderRow_(sh, sh.getLastColumn());
-  Logger.log(`✅ Links mapped: ${updated} employees`);
-  return `HTML links mapped: ${updated}`;
+  Logger.log(`✅ Links synced (batch): ${updated} employees, ${COL_NAMES.length} columns`);
+  return `Synced ${updated} employees — ${COL_NAMES.length} link columns updated`;
 }
 
 function HEALTH_CHECK_() {
