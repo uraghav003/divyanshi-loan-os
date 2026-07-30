@@ -18,7 +18,7 @@ jobs:
         run: |
           if [ -z "$GOOGLE_CREDENTIALS" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Deployment skipped: GOOGLE_CREDENTIALS is not configured."
+            echo "Deployment authorization is not configured; source validation remains available."
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
