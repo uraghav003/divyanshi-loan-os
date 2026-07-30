@@ -205,6 +205,10 @@ function P1_GET_EXEC_URL_() {
   const p = PropertiesService.getScriptProperties();
   let url = p.getProperty('P1_EXEC_URL') || p.getProperty('MAIN_SERVER_EXEC_URL') || '';
   if (!url) { try { url = ScriptApp.getService().getUrl(); } catch(_){} }
+  // Never hand out a /dev URL — only the script owner/editors can open it,
+  // so every generated employee link (website, form, card, calling, voice)
+  // would silently fail for regular staff. Always normalize to /exec.
+  url = String(url || '').replace(/\/dev(\?|$)/, '/exec$1');
   return url || '';
 }
 
