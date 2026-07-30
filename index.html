@@ -478,7 +478,7 @@ function sendChat(){
   body.innerHTML+='<div class="bubble user-b">'+safe(txt)+'</div>';
   inp.value='';body.scrollTop=body.scrollHeight;
   var publicCard=PAGE==='card'||PAGE==='home';
-  callGAS(publicCard?'P1_PUBLIC_CARD_CHAT':'BULBHUL_CHAT_API',publicCard?{message:txt,empCode:EMP}:{message:txt,empCode:EMP,source:'INDEX'}).then(function(res){
+  callGAS(publicCard?'P1_PUBLIC_CARD_CHAT':'BULBHUL_CHAT_API',publicCard?{message:txt,empCode:EMP}:{message:txt,empCode:EMP,accessToken:ACCESS_TOKEN,source:'INDEX'}).then(function(res){
     var reply=typeof res==='string'?res:(res&&(res.reply||res.text||res.message)||'Ji, bataiye?');
     body.innerHTML+='<div class="bubble bot-b">'+safe(reply)+'</div>';
     body.scrollTop=body.scrollHeight;

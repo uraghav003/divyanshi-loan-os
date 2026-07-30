@@ -1666,6 +1666,9 @@ function P1_PROCESS_EMPLOYEE_PASSWORD_RESET_(sh,row,headers) {
   const inputCell=sh.getRange(row,inputIndex+1), password=String(inputCell.getValue()||'');
   if(!password)return;
   inputCell.clearContent();
+  const actor=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
+  const allowed=String(PropertiesService.getScriptProperties().getProperty('PASSWORD_RESET_ALLOWED_EMAILS')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
+  if(!actor||!allowed.includes(actor)){sh.getRange(row,statusIndex+1).setValue('RESET_BLOCKED: master authorization required');return;}
   if(password.length<8||password.length>64){sh.getRange(row,statusIndex+1).setValue('RESET_REJECTED: 8–64 characters required');return;}
   const props=PropertiesService.getScriptProperties(),salt=Utilities.getUuid();
   props.setProperties({['PIN_HASH_'+code]:P1_PIN_DIGEST_(code,password,salt),['PIN_SALT_'+code]:salt});
