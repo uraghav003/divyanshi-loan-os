@@ -546,7 +546,11 @@ const BULBHUL_SYS_BASE_ =
 function BULBHUL_CHAT_API_(data) {
   data = data||{};
   const rawMsg = String(data.message||'').trim().slice(0,1000);
-  const emp    = data.empCode ? FIND_EMPLOYEE_FULL_(data.empCode) : null;
+  const empCode=String(data.empCode||'').trim().toUpperCase();
+  if(!empCode || !P1_VALIDATE_ACCESS_(empCode,data.accessToken)) return 'Your staff session has expired. Please sign in again.';
+  const emp    = FIND_EMPLOYEE_FULL_(empCode);
+  if(!emp) return 'Your staff account is unavailable.';
+  if(data.leadId && !P1_CASE_FOR_EMPLOYEE_(empCode,data.leadId)) return 'That case is not assigned to your account.';
   const role   = emp ? String(emp.ROLE||'').toUpperCase() : '';
   let rolePrompt = BULBHUL_ROLE_PROMPTS_['SALES MEMBER'];
   for (const k of Object.keys(BULBHUL_ROLE_PROMPTS_)) { if(role.includes(k)){rolePrompt=BULBHUL_ROLE_PROMPTS_[k];break;} }
@@ -567,6 +571,9 @@ function BULBHUL_CHAT_API_(data) {
 
   const fullPrompt = (emp?`[SENDER] ${emp.NAME}(${emp.EMP_CODE})|${emp.ROLE}\n`:'[SENDER] Visitor\n') + extraCtx + '\n\n[USER]: ' + rawMsg;
   let reply = MULTI_BRAIN_REPLY_(fullPrompt, sysPrompt);
+  // Assistant replies are advisory only. CRM writes and outbound messages require
+  // an explicit, separately authorised workflow rather than model-generated commands.
+  return String(reply||'Assistant is unavailable. Please retry.');
 
   // Execute embedded commands
   let log='';
@@ -683,10 +690,25 @@ function COMPUTE_TAT_(loanType) {
 function P1_SMART_FORM_SUBMIT_(p) {
   try {
     p=p||{};
-    return DC_PROCESS_LEAD_({
-      EMP_CODE:String(p.emp_code||p.EMP_CODE||'').trim().toUpperCase(),
-      CLIENT_NAME:String(p.client_name||p.CLIENT_NAME||p.full_name||'').trim(),
-      CLIENT_MOBILE:DC_CLEAN_MOBILE_(p.client_mobile||p.CLIENT_MOBILE||p.mobile||''),
+    const entryType=String(p.entry_type||'SALES_LEAD').trim().toUpperCase();
+    const isPeople=['NEW_STAFF_ENTRY','INTERVIEW_ENTRY'].includes(entryType);
+    const mobile=DC_CLEAN_MOBILE_(p.client_mobile||p.CLIENT_MOBILE||p.mobile||'');
+    const clientName=String(p.client_name||p.CLIENT_NAME||p.full_name||'').trim();
+    const loanType=String(p.loan_type||p.LOAN_TYPE||'').trim();
+    if(clientName.length<2 || !/^[6-9]\d{9}$/.test(mobile)) return {ok:false,err:'Enter a valid name and 10-digit Indian mobile number.'};
+    if(isPeople ? !p.candidate_consent : !p.data_consent) return {ok:false,err:'Privacy consent is required.'};
+    if(!isPeople && (!loanType || !String(p.employment_type||'').trim() || Number(p.required_loan_amount||p.amount||0)<1000)) return {ok:false,err:'Loan type, employment type and amount of at least INR 1,000 are required.'};
+    const configuredVersion=String(PropertiesService.getScriptProperties().getProperty('CONSENT_VERSION')||'').trim();
+    const configuredPrivacy=String(PropertiesService.getScriptProperties().getProperty('PRIVACY_URL')||'').trim();
+    if(!configuredVersion || !configuredPrivacy || String(p.consent_version||'')!==configuredVersion) return {ok:false,err:'Consent configuration is unavailable. Please contact support.'};
+    const referredEmp=String(p.emp_code||p.EMP_CODE||'').trim().toUpperCase();
+    const employee=referredEmp?FIND_EMPLOYEE_FULL_(referredEmp):null;
+    if(!isPeople && !employee) return {ok:false,err:'This referral link is not assigned to an active employee.'};
+    const result=DC_PROCESS_LEAD_({
+      EMP_CODE:employee?employee.EMP_CODE:'',
+      MANAGER_EMAIL:employee?employee.MANAGER_EMAIL||'':'',
+      CLIENT_NAME:clientName,
+      CLIENT_MOBILE:mobile,
       CLIENT_EMAIL:DC_CLEAN_EMAIL_(p.client_email||p.CLIENT_EMAIL||p.email||''),
       CITY_LOCATION:String(p.city_location||p.CITY_LOCATION||'').trim(),
       PAN_NO:String(p.pan_no||p.PAN_NO||'').toUpperCase().trim(),
@@ -696,7 +718,7 @@ function P1_SMART_FORM_SUBMIT_(p) {
       EXISTING_EMI:p.existing_emi||p.EXISTING_EMI||'0',
       AGE:p.age||p.AGE||'',
       CIBIL_SCORE:p.cibil_score||p.CIBIL_SCORE||p.credit_score||'',
-      LOAN_TYPE:String(p.loan_type||p.LOAN_TYPE||'').trim(),
+      LOAN_TYPE:loanType,
       PREFERRED_BANK:String(p.preferred_bank||p.PREFERRED_BANK||'').trim(),
       REQUIRED_LOAN_AMOUNT:String(p.required_loan_amount||p.REQUIRED_LOAN_AMOUNT||p.amount||'').trim(),
       DOCS_LINK:p.docs_link||p.DOCS_LINK||'',
@@ -704,8 +726,21 @@ function P1_SMART_FORM_SUBMIT_(p) {
       CASE_CATEGORY:p.case_category||p.CASE_CATEGORY||p.case_status||'OPEN',
       REMARKS:String(p.remarks||p.REMARKS||'').trim(),
       SOURCE_TYPE:p.source_type||p.SOURCE_TYPE||'WEB_APP',
-      SOURCE_NAME:p.source_name||p.SOURCE_NAME||'P1_SMART_FORM'
+      SOURCE_NAME:p.source_name||p.SOURCE_NAME||'P1_SMART_FORM',
+      CONSENT_VERSION:configuredVersion,
+      CONSENT_AT:new Date(),
+      CONSENT_SOURCE:'WEB_APP',
+      PRIVACY_NOTICE_URL:configuredPrivacy,
+      SELECTED_DOCUMENTS:Array.isArray(p.selected_documents)?p.selected_documents.join(', ').slice(0,2000):''
     });
+    if(!result||!result.ok) return result;
+    const files=Array.isArray(p.files)?p.files:[];
+    if(files.length){
+      const upload=P1_STORE_PUBLIC_FILES_(p, result.leadId||result.lid||'', files);
+      if(!upload.ok) return {ok:false,err:upload.err||'Documents were not saved; no submission was confirmed.'};
+      result.docsLink=upload.folderUrl;
+    }
+    return result;
   } catch(e){ LOG_ERR_('P1_SMART_FORM_SUBMIT','',e.message); return {ok:false,err:e.message}; }
 }
 
@@ -1525,7 +1560,8 @@ function doGet(e) {
     if(page==='calling')return HtmlService.createHtmlOutputFromFile('calling').setTitle('Bulbhul Calling | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     if(page==='voice')return HtmlService.createHtmlOutputFromFile('voice').setTitle('Bulbhul Voice | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     const publicProfile=emp?P1_GET_PUBLIC_CARD_PROFILE_(emp):null;
-    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:publicProfile,avatar:(page==='card'&&emp)?publicProfile:null,dashboard:page==='dashboard'?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
+    // Dashboard data is loaded only after client-side session verification; never embed case data in a public URL response.
+    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:publicProfile,avatar:(page==='card'&&emp)?publicProfile:null,dashboard:null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
     html=html.split('__P1_BOOT_DATA_JSON__').join(JSON.stringify(bootData).replace(/</g,'\\u003c'));
     return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital — P1 Digital Duniya').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -2265,6 +2301,21 @@ function P1_MINT_ACCESS_TOKEN_(empCode) {
   SC_.put('ACCESS_' + token, String(empCode || '').trim().toUpperCase(), 21600);
   return token;
 }
+
+function P1_PIN_DIGEST_(empCode, pin, salt) {
+  const material = [String(empCode || '').trim().toUpperCase(), String(salt || ''), String(pin || '')].join(':');
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, material, Utilities.Charset.UTF_8)
+    .map(function (byte) { return ('0' + (byte & 0xff).toString(16)).slice(-2); }).join('');
+}
+
+function P1_AUTH_FAILURE_KEY_(empCode) { return 'AUTH_FAIL_' + String(empCode || '').trim().toUpperCase(); }
+function P1_IS_AUTH_THROTTLED_(empCode) { return Number(SC_.get(P1_AUTH_FAILURE_KEY_(empCode)) || 0) >= 5; }
+function P1_RECORD_AUTH_FAILURE_(empCode) {
+  const key = P1_AUTH_FAILURE_KEY_(empCode);
+  const attempts = Number(SC_.get(key) || 0) + 1;
+  SC_.put(key, String(attempts), attempts >= 5 ? 900 : 900);
+}
+function P1_CLEAR_AUTH_FAILURES_(empCode) { SC_.remove(P1_AUTH_FAILURE_KEY_(empCode)); }
 function P1_VALIDATE_ACCESS_(empCode, token) {
   try {
     const code = String(empCode || '').trim().toUpperCase();
@@ -2278,13 +2329,29 @@ function P1_VALIDATE_ACCESS_(empCode, token) {
 function P1_VERIFY_EMP(payload) {
   payload = payload || {};
   const emp = FIND_EMPLOYEE_FULL_(String(payload.empCode || '').toUpperCase());
-  if (!emp) return { ok: false, err: 'Employee not found' };
-  const storedPin = PropertiesService.getScriptProperties().getProperty('PIN_' + emp.EMP_CODE)
-                 || PropertiesService.getScriptProperties().getProperty('DEFAULT_PIN')
-                 || '1234';
+  if (!emp) return { ok: false, err: 'Invalid employee code or PIN' };
+  if (P1_IS_AUTH_THROTTLED_(emp.EMP_CODE)) return { ok: false, err: 'Too many attempts. Please wait 15 minutes and try again.' };
+  const props = PropertiesService.getScriptProperties();
+  const hashKey = 'PIN_HASH_' + emp.EMP_CODE;
+  const saltKey = 'PIN_SALT_' + emp.EMP_CODE;
+  const storedHash = String(props.getProperty(hashKey) || '');
+  const storedPin = String(props.getProperty('PIN_' + emp.EMP_CODE) || '');
   const pin = String(payload.pin || '').trim();
-  const valid = !!pin && (pin === storedPin || (emp.MOBILE && emp.MOBILE.slice(-4) === pin));
-  return { ok: valid, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: valid ? P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE) : '', err: valid ? '' : 'Invalid PIN' };
+  let valid = false;
+  if (pin && storedHash) valid = P1_PIN_DIGEST_(emp.EMP_CODE, pin, props.getProperty(saltKey)) === storedHash;
+  // One-time migration of a PIN already configured by HR. Shared/default/mobile PINs are never accepted.
+  if (!valid && pin && !storedHash && storedPin && pin === storedPin) {
+    const salt = Utilities.getUuid();
+    props.setProperties({[hashKey]: P1_PIN_DIGEST_(emp.EMP_CODE, pin, salt), [saltKey]: salt});
+    props.deleteProperty('PIN_' + emp.EMP_CODE);
+    valid = true;
+  }
+  if (!valid) {
+    P1_RECORD_AUTH_FAILURE_(emp.EMP_CODE);
+    return { ok: false, err: 'Invalid employee code or PIN' };
+  }
+  P1_CLEAR_AUTH_FAILURES_(emp.EMP_CODE);
+  return { ok: true, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE), err: '' };
 }
 
 /* ── index.html: callGAS('get_boot_data', {empCode,page}) ── */
@@ -2300,7 +2367,7 @@ function get_boot_data(payload) {
     banks: P1_GET_BANK_OPTIONS_MAP_(),
     staff: emp ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
     avatar: (page === 'card' && emp) ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
-    dashboard: (page === 'dashboard' && emp) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
+    dashboard: (page === 'dashboard' && emp && P1_VALIDATE_ACCESS_(emp, payload.accessToken)) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
   };
 }
 
@@ -2339,9 +2406,34 @@ function P1_ISSUE_UPLOAD_TOKEN(submissionKey, route) {
     const key = String(submissionKey || '').trim();
     if (!key) throw new Error('submissionKey required');
     const token = Utilities.getUuid().replace(/-/g, '');
-    SC_.put('UPLOAD_TOKEN_' + token, JSON.stringify({ key: key, route: String(route || '') }), 1800);
+    SC_.put('UPLOAD_TOKEN_' + token, JSON.stringify({ key: key }), 900);
     return token;
   } catch (e) { LOG_ERR_('P1_ISSUE_UPLOAD_TOKEN', '', e.message); throw e; }
+}
+
+function P1_STORE_PUBLIC_FILES_(payload, leadId, files) {
+  const token=String(payload.upload_token||'').trim(), submissionKey=String(payload.submission_key||'').trim();
+  const cached=token?SC_.get('UPLOAD_TOKEN_'+token):'';
+  if(!cached) return {ok:false,err:'Upload session expired. Please select files and submit again.'};
+  let grant={}; try{grant=JSON.parse(cached);}catch(_){ }
+  if(!submissionKey || grant.key!==submissionKey) return {ok:false,err:'Upload session validation failed.'};
+  if(!leadId || files.length>3) return {ok:false,err:'A maximum of 3 documents can be uploaded.'};
+  const allowed={'application/pdf':true,'image/jpeg':true,'image/png':true}; let total=0;
+  const clean=[];
+  for(let i=0;i<files.length;i++){
+    const f=files[i]||{}, mime=String(f.mimeType||'').toLowerCase();
+    if(!allowed[mime]||!f.base64) return {ok:false,err:'Only PDF, JPG and PNG documents are accepted.'};
+    const bytes=Utilities.base64Decode(String(f.base64).split(',').pop());
+    if(bytes.length>2*1024*1024) return {ok:false,err:'Each document must be 2 MB or smaller.'};
+    total+=bytes.length; if(total>5*1024*1024) return {ok:false,err:'Total document upload must be 5 MB or smaller.'};
+    clean.push({bytes:bytes,mime:mime,name:String(f.name||('document_'+(i+1))).replace(/[^a-zA-Z0-9._ -]/g,'_').slice(0,100)});
+  }
+  const parentId=String(PropertiesService.getScriptProperties().getProperty('CLIENT_DOCS_FOLDER_ID')||'').trim();
+  if(!parentId) return {ok:false,err:'Document storage is not configured.'};
+  const parent=DriveApp.getFolderById(parentId), folder=parent.createFolder(String(leadId).replace(/[^a-zA-Z0-9_-]/g,'_'));
+  clean.forEach(f=>folder.createFile(Utilities.newBlob(f.bytes,f.mime,f.name)));
+  SC_.remove('UPLOAD_TOKEN_'+token);
+  return {ok:true,folderUrl:folder.getUrl()};
 }
 
 /* ── smart_form.html: loadLoanData() ── */
@@ -2374,7 +2466,7 @@ function P1_GET_CALLING_QUEUE(empCode, accessToken) {
     }).length;
     const queue = open.slice(0, 100).map(r => ({
       leadId: r.LEAD_ID || '', clientName: r.CLIENT_NAME || '', mobile: r.CLIENT_MOBILE || '',
-      loanType: r.LOAN_TYPE || '', amount: r.REQUIRED_LOAN_AMOUNT || '', bank: r.PREFERRED_BANK || '',
+      name:r.CLIENT_NAME || '', type:r.LOAN_TYPE || '', loanType: r.LOAN_TYPE || '', amount: r.REQUIRED_LOAN_AMOUNT || '', bank: r.PREFERRED_BANK || '',
       status: r.CASE_CATEGORY || 'OPEN', remarks: r.REMARKS || '', tatStatus: r.TAT_STATUS || 'ACTIVE', empCode: r.EMP_CODE || ''
     }));
     const aiAvailable = !!(DC_CFG.DEEPSEEK_KEY || DC_CFG.OPENAI_KEY || DC_CFG.GEMINI_KEY);
@@ -2385,6 +2477,17 @@ function P1_GET_CALLING_QUEUE(empCode, accessToken) {
   } catch (e) { LOG_ERR_('P1_GET_CALLING_QUEUE', empCode, e.message); return { ok: false, err: e.message }; }
 }
 
+function P1_CASE_FOR_EMPLOYEE_(empCode, leadId) {
+  const code=String(empCode||'').trim().toUpperCase(), id=String(leadId||'').trim().toUpperCase();
+  const emp=FIND_EMPLOYEE_FULL_(code); if(!emp||!id)return null;
+  const role=String(emp.ROLE||'').toUpperCase(), dept=String(emp.DEPARTMENT||'').toUpperCase();
+  const lead=GET_MASTER_SNAPSHOT_().find(r=>String(r.LEAD_ID||'').trim().toUpperCase()===id); if(!lead)return null;
+  if(['MD','FOUNDER','ADMIN','DIRECTOR'].some(r=>role.includes(r))||dept.includes('MANAGEMENT'))return lead;
+  if(String(lead.EMP_CODE||'').trim().toUpperCase()===code)return lead;
+  if(String(lead.MANAGER_EMAIL||'').trim().toLowerCase()===String(emp.EMAIL||'').trim().toLowerCase())return lead;
+  return null;
+}
+
 /* ── calling.html: AI-suggested disposition remark ── */
 function P1_CALLING_AI_REMARK(payload) {
   payload = payload || {};
@@ -2392,7 +2495,7 @@ function P1_CALLING_AI_REMARK(payload) {
     const empCode = String(payload.empCode || '').trim().toUpperCase();
     if (!P1_VALIDATE_ACCESS_(empCode, payload.accessToken)) return { ok: false, err: 'Session expired' };
     const leadId = String(payload.leadId || '').trim().toUpperCase();
-    const lead = GET_MASTER_SNAPSHOT_().find(r => String(r.LEAD_ID || '').toUpperCase() === leadId);
+    const lead = P1_CASE_FOR_EMPLOYEE_(empCode,leadId);
     if (!lead) return { ok: false, err: 'Lead not found' };
     const sys = BULBHUL_SYS_BASE_ + '\n\nTask: Suggest one short, professional call-disposition remark (1-2 sentences, Hinglish) based on the case snapshot below. Reply with the remark only, no preamble.';
     const prompt = '[CASE]\n' + JSON.stringify({ client: lead.CLIENT_NAME, loan: lead.LOAN_TYPE, bank: lead.PREFERRED_BANK, status: lead.CASE_CATEGORY, remarks: lead.REMARKS }, null, 2);
@@ -2407,8 +2510,9 @@ function P1_CALLING_UPDATE(payload) {
   try {
     const agent = String(payload.agent || '').trim().toUpperCase();
     if (!P1_VALIDATE_ACCESS_(agent, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const query = payload.leadId || payload.mobile;
-    const res = UPDATE_LEAD_STATUS_(query, payload.status, payload.remarks);
+    const lead=P1_CASE_FOR_EMPLOYEE_(agent,payload.leadId);
+    if(!lead) return {ok:false,err:'This case is not assigned to your account.'};
+    const res = UPDATE_LEAD_STATUS_(lead.LEAD_ID, payload.status, payload.remarks);
     if (res.ok) {
       try { RECORD_TASK_FOR_ATTENDANCE_(agent); } catch (_) {}
       const sh = GET_OR_CREATE_('CALL_LOG');
@@ -2425,9 +2529,11 @@ function P1_CALLING_START(payload) {
   try {
     const code = String(payload.empCode || '').trim().toUpperCase();
     if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const lead=P1_CASE_FOR_EMPLOYEE_(code,payload.leadId);
+    if(!lead)return {ok:false,err:'This case is not assigned to your account.'};
     const sh = GET_OR_CREATE_('CALL_LOG');
     P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'MOBILE', 'STATUS', 'REMARKS', 'DURATION_SEC']);
-    sh.appendRow([new Date(), code, String(payload.leadId || '').trim(), '', 'STARTED', '', 0]);
+    sh.appendRow([new Date(), code, String(lead.LEAD_ID || '').trim(), '', 'DIAL_ATTEMPTED', '', 0]);
     return { ok: true };
   } catch (e) { LOG_ERR_('P1_CALLING_START', '', e.message); return { ok: false, err: e.message }; }
 }
@@ -2441,6 +2547,7 @@ function P1_MINI_CRM_UPLOAD(payload) {
     const leadId = String(payload.leadId || '').trim();
     const files = Array.isArray(payload.files) ? payload.files : [];
     if (!leadId) return { ok: false, err: 'leadId required' };
+    if (!P1_CASE_FOR_EMPLOYEE_(code,leadId)) return {ok:false,err:'This case is not assigned to your account.'};
     if (!files.length) return { ok: true, skipped: true };
 
     const parentId = PropertiesService.getScriptProperties().getProperty('CLIENT_DOCS_FOLDER_ID');
@@ -2488,9 +2595,14 @@ function P1_PROCESS_VOICE_COMMAND(payload) {
   try {
     const code = String(payload.empCode || '').trim().toUpperCase();
     if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const mobile = DC_CLEAN_MOBILE_(payload.mobile || '');
-    if (!mobile) return { ok: false, err: 'Valid 10-digit mobile required' };
-    DC_SEND_TG_('📞 [VOICE CALL] ' + code + ' → +91' + mobile + (payload.leadId ? ' | Lead: ' + payload.leadId : ''));
-    return { ok: true, message: 'Call initiated via FreePBX bridge' };
+    const lead=P1_CASE_FOR_EMPLOYEE_(code,payload.leadId);
+    if(!lead) return {ok:false,err:'Open Voice Control from an assigned case.'};
+    const mobile=DC_CLEAN_MOBILE_(lead.CLIENT_MOBILE||'');
+    if(!/^[6-9]\d{9}$/.test(mobile)) return {ok:false,err:'The assigned case does not have a valid Indian mobile number.'};
+    // A provider call is deliberately not claimed until a configured PBX adapter returns a call ID.
+    DC_SEND_TG_('📞 [VOICE CALL REQUEST] ' + code + ' → +91' + mobile + ' | Lead: ' + lead.LEAD_ID);
+    const sh=GET_OR_CREATE_('CALL_LOG'); P1_ENSURE_HEADERS_(sh,['TIMESTAMP','EMP_CODE','LEAD_ID','MOBILE','STATUS','REMARKS','DURATION_SEC']);
+    sh.appendRow([new Date(),code,lead.LEAD_ID,mobile,'VOICE_REQUEST_LOGGED','PBX adapter not configured',0]);
+    return {ok:true,message:'Call request logged. Your PBX administrator must configure the bridge before calls can be placed.'};
   } catch (e) { LOG_ERR_('P1_PROCESS_VOICE_COMMAND', payload.empCode, e.message); return { ok: false, err: e.message }; }
 }

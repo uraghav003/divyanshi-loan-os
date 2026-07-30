@@ -245,24 +245,25 @@
       }
 
       callBtn.disabled = true;
-      callBtn.innerText = 'Connecting...';
-      setLog('CONNECTING_TO_FREEPBX → +91' + mobile + ' ...', 'loading');
+      if (!LEAD_ID) { setLog('ERROR: Open Voice Control from an assigned case.', 'error'); return; }
+      callBtn.innerText = 'Submitting request...';
+      setLog('VALIDATING_ASSIGNED_CASE → +91' + mobile + ' ...', 'loading');
 
       google.script.run
         .withSuccessHandler(function(res) {
           callBtn.disabled = false;
-          callBtn.innerText = 'Initiate Voice Call';
+          callBtn.innerText = 'Request Voice Call';
 
           if (res && (res.ok || res.success)) {
             const msg = res.message || 'Voice call request accepted';
-            setLog('VOICE_CALL_REQUESTED: ' + msg, 'success');
+            setLog('VOICE_CALL_REQUEST_LOGGED: ' + msg, 'success');
           } else {
             setLog('ERROR: ' + (res && (res.err || res.error || res.errorMessage) || 'Unknown response'), 'error');
           }
         })
         .withFailureHandler(function(err) {
           callBtn.disabled = false;
-          callBtn.innerText = 'Initiate Voice Call';
+          callBtn.innerText = 'Request Voice Call';
           setLog('ERROR: Bridge disconnected — ' + (err.message || err), 'error');
         })
         .P1_PROCESS_VOICE_COMMAND({mobile:mobile,leadId:LEAD_ID,empCode:EMP_CODE,accessToken:ACCESS_TOKEN});
@@ -273,7 +274,7 @@
       const preset=params.get('mobile')||'';if(preset)phoneInput.value=preset;
       if(!EMP_RE.test(EMP_CODE)||!ACCESS_TOKEN){callBtn.disabled=true;bridgeStatus.innerText='Access Required';setLog('ERROR: Open Voice Control from your verified staff dashboard.', 'error');return;}
       if(!window.google||!google.script||!google.script.run){callBtn.disabled=true;bridgeStatus.innerText='Preview Only';setLog('ERROR: Backend not connected. Open the deployed Web App URL.', 'error');return;}
-      bridgeStatus.innerText='Secure Session Active';setLog('Ready. Enter an assigned client mobile number.', 'success');
+      bridgeStatus.innerText='Secure Session Active';setLog(LEAD_ID?'Ready to request a call for the assigned case.':'Open Voice Control from an assigned case.', LEAD_ID?'success':'error');if(!LEAD_ID)callBtn.disabled=true;
     }
 
     // Enter key support

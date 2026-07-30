@@ -253,6 +253,8 @@ var PAGE=String(BOOT.page||qs.get('page')||'home').toLowerCase();
 var EMP=String(BOOT.emp||qs.get('emp')||qs.get('emp_code')||'').toUpperCase();
 var PRODUCT=String(BOOT.product||qs.get('product')||'').toUpperCase();
 var EMP_ENC=encodeURIComponent(EMP);
+var ACCESS_TOKEN='';
+try{ACCESS_TOKEN=String(sessionStorage.getItem('p1_access_'+EMP)||'').trim();}catch(_){}
 var PRODUCTS=BOOT.products&&BOOT.products.length?BOOT.products:[
   {code:'PL',name:'Personal Loan',icon:'💳',tat:3,roi:10.5},
   {code:'BL',name:'Business Loan',icon:'🏢',tat:7,roi:16},
@@ -480,7 +482,13 @@ function renderApp(){
     if(!document.getElementById('app'))return;
     if((!BOOT.staff||!BOOT.staff.ok)&&EMP&&EMP!=='EMP_CODE'){
       document.getElementById('app').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:var(--navy)"><div style="width:44px;height:44px;border:4px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:14px"></div><strong>'+EMP+' profile sync ho raha hai...</strong></div>';
-      callGAS('get_boot_data',{empCode:EMP,page:PAGE}).then(function(res){if(res){BOOT=res;if(res.staff)STAFF=res.staff;if(res.dashboard)DASH=res.dashboard;}renderPage();}).catch(function(){renderPage();});
+      callGAS('get_boot_data',{empCode:EMP,page:PAGE,accessToken:ACCESS_TOKEN}).then(function(res){if(res){BOOT=res;if(res.staff)STAFF=res.staff;if(res.dashboard)DASH=res.dashboard;}renderPage();}).catch(function(){renderPage();});
+    }else if(PAGE==='dashboard'){
+      if(!ACCESS_TOKEN){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);return;}
+      callGAS('get_boot_data',{empCode:EMP,page:PAGE,accessToken:ACCESS_TOKEN}).then(function(res){
+        if(!res||!res.dashboard||!res.dashboard.ok){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);return;}
+        BOOT=res;STAFF=res.staff||STAFF;DASH=res.dashboard;renderPage();
+      }).catch(function(){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);});
     }else renderPage();
   }catch(e){document.getElementById('app').innerHTML='<div style="padding:40px"><h2 style="color:red">Error</h2><p>'+safe(e.message)+'</p></div>';}
 }

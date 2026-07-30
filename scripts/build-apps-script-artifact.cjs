@@ -19,6 +19,18 @@ for (const file of deployFiles) {
 JSON.parse(fs.readFileSync(path.join(root, 'appsscript.json'), 'utf8'));
 new vm.Script(fs.readFileSync(path.join(root, 'Code.gs'), 'utf8'), { filename: 'Code.gs' });
 
+// Apps Script HTML files are part of the deployable surface. Parse every inline
+// script so a syntax error cannot reach a web-app deployment unnoticed.
+for (const file of deployFiles.filter((name) => name.endsWith('.html'))) {
+  const html = fs.readFileSync(path.join(root, file), 'utf8');
+  const scripts = html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi);
+  let index = 0;
+  for (const match of scripts) {
+    const source = match[1].trim();
+    if (source) new vm.Script(source, { filename: `${file} inline script ${++index}` });
+  }
+}
+
 const claspIgnore = fs.readFileSync(path.join(root, '.claspignore'), 'utf8');
 for (const duplicate of ['Code_Part1.gs', 'Code_Part2.gs']) {
   if (!claspIgnore.includes(duplicate)) throw new Error(`${duplicate} must be excluded by .claspignore.`);
