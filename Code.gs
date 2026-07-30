@@ -498,6 +498,39 @@ const BULBHUL_ROLE_PROMPTS_ = {
   'HR'           :'You are BULBHUL for HR Head Khushboo (DC013). Hiring, attendance, onboarding.'
 };
 
+/* Employee-card personas: the bot reflects the employee's real role/department,
+   but stays advisory and never exposes internal records or makes decisions. */
+function P1_EMPLOYEE_PERSONA_(emp) {
+  const role=String((emp&&emp.ROLE)||'').toUpperCase();
+  const dept=String((emp&&emp.DEPARTMENT)||'').toUpperCase();
+  const label=String((emp&&emp.NAME)||'Divyanshi Capital');
+  if(role.includes('HR')||dept.includes('HR')||dept.includes('HUMAN RESOURCE')) return {
+    title:label+'\'s Hiring Assistant',
+    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke HR desk se. Jobs, hiring process, interview preparation aur application steps ke baare mein poochiye.',
+    instruction:'You support prospective candidates for HR and hiring. Explain available hiring/application steps only from approved knowledge, suggest a formal application or HR follow-up, and never promise selection, salary, an interview, or a joining date. Never disclose employee or candidate information.'
+  };
+  if(role.includes('ACCOUNT')||dept.includes('ACCOUNT')||dept.includes('FINANCE')) return {
+    title:label+'\'s Accounts Assistant',
+    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke Accounts desk se. Disbursement process, receipts aur general payment guidance ke baare mein poochiye.',
+    instruction:'You support general accounts and disbursement-process questions. Do not confirm payments, balances, settlements, or account details. Never request banking credentials, OTPs, PINs, card details, or payment screenshots.'
+  };
+  if(role.includes('LOGIN')||role.includes('OPERATION')||dept.includes('LOGIN')||dept.includes('OPERATION')) return {
+    title:label+'\'s Processing Assistant',
+    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke loan-processing desk se. Documents, bank-login process aur next steps ke baare mein poochiye.',
+    instruction:'You support general loan-processing, documents, and bank-login preparation questions. Do not reveal or infer an application status, bank decision, case data, or TAT promise. Direct case-specific requests to the assigned team member.'
+  };
+  if(role.includes('MD')||role.includes('FOUNDER')||role.includes('DIRECTOR')||dept.includes('MANAGEMENT')) return {
+    title:label+'\'s Executive Assistant',
+    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke digital executive assistant ke roop mein. Divyanshi Capital, partnerships aur our lending vision ke baare mein poochiye.',
+    instruction:'You support public company, partnership, and leadership questions. Keep answers factual and professional. Do not disclose internal strategy, employee data, financials, or confidential operational information.'
+  };
+  return {
+    title:label+'\'s Loan Assistant',
+    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke saath Divyanshi Capital se. Loan options, documents aur application ke next step ke baare mein poochiye.',
+    instruction:'You support prospective borrowers. Explain general loan options, documents, eligibility preparation, and the application process. Never guarantee approval, invent rates, or make a credit decision. For a personal assessment, direct visitors to the employee application link.'
+  };
+}
+
 const BULBHUL_SYS_BASE_ =
   '# BULBHUL V2 | Divyanshi Capital Pvt Ltd\n' +
   'Products: PL(3d) BL(7d) HL(15d) LAP(15d) AUTO(5d)\n' +
@@ -517,6 +550,7 @@ function BULBHUL_CHAT_API_(data) {
   const role   = emp ? String(emp.ROLE||'').toUpperCase() : '';
   let rolePrompt = BULBHUL_ROLE_PROMPTS_['SALES MEMBER'];
   for (const k of Object.keys(BULBHUL_ROLE_PROMPTS_)) { if(role.includes(k)){rolePrompt=BULBHUL_ROLE_PROMPTS_[k];break;} }
+  if(emp) rolePrompt += '\n\nEmployee persona: '+P1_EMPLOYEE_PERSONA_(emp).instruction;
   const sysPrompt = BULBHUL_SYS_BASE_ + '\n\n[LIVE CONTEXT]\n' + BUILD_AI_CONTEXT_(data.empCode) + '\n\n' + rolePrompt;
 
   let extraCtx = '';
@@ -1274,6 +1308,13 @@ function onEdit(e) {
     const sh=e.range.getSheet(),name=sh.getName(),row=e.range.getRow(),col=e.range.getColumn();
     if(row<2)return;
 
+    // ALL_EMPLOYEES: once the core identity fields exist, complete the schema
+    // and create this employee's public links automatically.
+    if(name==='ALL_EMPLOYEES'){
+      try { P1_SYNC_EMPLOYEE_ROW_(sh,row); } catch(e) { LOG_ERR_('onEdit.ALL_EMPLOYEES','',e.message); }
+      return;
+    }
+
     // Auto LAST_UPDATED (lightweight — single cell write)
     try {
       const headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
@@ -1413,6 +1454,8 @@ function DC_INSTALL_P1_FINAL_() {
     P1_ENSURE_HEADERS_(snSh,P1_TAB_MAP.SOURCE_NAME());
     snSh.getRange(2,1,17,2).setValues([['Sales Team','SALES'],['Manual Calling','SALES'],['AI Auto Calling','SALES'],['WhatsApp','SALES'],['Website','SALES'],['Referral','SALES'],['Walk-in','SALES'],['Instagram','SALES'],['Facebook','SALES'],['LinkedIn','SALES'],['Email Campaign','SALES'],['Bank Referral','SALES'],['GoDial Auto Calling','SALES'],['DSA','LOGIN DEPARTMENT'],['Send to Login','LOGIN DEPARTMENT'],['MIS-Incoming','REPORT'],['ONBOARD','HR']]);
   }
+  // Make ALL_EMPLOYEES self-maintaining before staff links are shared.
+  P1_NORMALIZE_ALL_EMPLOYEES_();
   const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','onEdit','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
@@ -1481,7 +1524,8 @@ function doGet(e) {
     if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Smart Intake | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     if(page==='calling')return HtmlService.createHtmlOutputFromFile('calling').setTitle('Bulbhul Calling | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     if(page==='voice')return HtmlService.createHtmlOutputFromFile('voice').setTitle('Bulbhul Voice | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),avatar:(page==='card'&&emp)?P1_GET_AVATAR_PROFILE_(emp):null,dashboard:page==='dashboard'?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
+    const publicProfile=emp?P1_GET_PUBLIC_CARD_PROFILE_(emp):null;
+    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:publicProfile,avatar:(page==='card'&&emp)?publicProfile:null,dashboard:page==='dashboard'?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
     html=html.split('__P1_BOOT_DATA_JSON__').join(JSON.stringify(bootData).replace(/</g,'\\u003c'));
     return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital — P1 Digital Duniya').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -1567,61 +1611,53 @@ function CLEAR_CACHE_NOW()            { INVALIDATE_ALL_CACHES_(); Logger.log('�
 function P1_MAP_HTML_LINKS_() {
   const sh = SHEET_('ALL_EMPLOYEES');
   if (!sh) throw new Error('ALL_EMPLOYEES missing');
-  const data = sh.getDataRange().getValues();
-  if (data.length < 2) throw new Error('ALL_EMPLOYEES empty');
+  return P1_NORMALIZE_ALL_EMPLOYEES_();
+}
 
-  const headers = data[0].map(DC_NORM_);
-  const base = P1_GET_EXEC_URL_();
+const P1_EMPLOYEE_CORE_FIELDS_=['EMP_CODE','EMPLOYEES_NAME','ROLE','DEPARTMENT','EMPLOYEE_EMAIL_ID','MOBILE','MANAGER_EMAIL_ID'];
 
-  function ensureCol(name) {
-    const norm = DC_NORM_(name);
-    let i = headers.indexOf(norm);
-    if (i === -1) {
-      const newCol = sh.getLastColumn() + 1;
-      sh.getRange(1, newCol).setValue(name);
-      i = newCol - 1;
-      headers.push(norm);
-    }
-    return i;
-  }
+function P1_EMPLOYEE_HEADERS_(){ return P1_TAB_MAP.ALL_EMPLOYEES().concat(AVATAR_SOCIAL_COLS_); }
 
-  const iCode = headers.indexOf(DC_NORM_('EMP_CODE'));
-  const iName = headers.indexOf(DC_NORM_('EMPLOYEES_NAME'));
-  if (iCode === -1) throw new Error('EMP_CODE column missing in ALL_EMPLOYEES');
-
-  const p1Cols = {
-    web: ensureCol('P1_WEBSITE_URL'),
-    form: ensureCol('P1_SMART_FORM_URL'),
-    dash: ensureCol('P1_DASHBOARD_URL'),
-    call: ensureCol('P1_CALLING_URL'),
-    avt: ensureCol('P1_AVATAR_URL'),
-    sync: ensureCol('P1_SYNC_STATUS'),
-    at: ensureCol('P1_LAST_SYNC_AT')
-  };
-
-  let updated = 0;
-  for (let i = 1; i < data.length; i++) {
-    const code = String(data[i][iCode] || '').trim().toUpperCase();
-    if (!code) continue;
-    const name = String(iName > -1 ? data[i][iName] : code).trim() || code;
-    const e = encodeURIComponent(code);
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=160`;
-    const row = i + 1;
-
-    sh.getRange(row, p1Cols.web + 1).setFormula(`=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`);
-    sh.getRange(row, p1Cols.form + 1).setFormula(`=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`);
-    sh.getRange(row, p1Cols.dash + 1).setFormula(`=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`);
-    sh.getRange(row, p1Cols.call + 1).setFormula(`=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`);
-    sh.getRange(row, p1Cols.avt + 1).setValue(avatar);
-    sh.getRange(row, p1Cols.sync + 1).setValue('CONNECTED');
-    sh.getRange(row, p1Cols.at + 1).setValue(new Date());
-    updated++;
-  }
-
+/* Idempotent schema + per-row employee link provisioning. It never creates a
+   Telegram or WhatsApp identity: those require a separately verified channel. */
+function P1_SYNC_EMPLOYEE_ROW_(sh,row) {
+  const headers=P1_ENSURE_HEADERS_(sh,P1_EMPLOYEE_HEADERS_());
+  if(row<2) return {ok:false,err:'Header row'};
+  const h=headers.map(DC_NORM_), idx=n=>h.indexOf(DC_NORM_(n));
+  const values=sh.getRange(row,1,1,headers.length).getValues()[0];
+  const read=n=>String(values[idx(n)]||'').trim();
+  const missing=P1_EMPLOYEE_CORE_FIELDS_.filter(n=>!read(n));
+  if(missing.length) return {ok:false,pending:true,missing};
+  const code=read('EMP_CODE').toUpperCase(), name=read('EMPLOYEES_NAME')||code, base=P1_GET_EXEC_URL_();
+  const write=(n,v)=>{const i=idx(n);if(i>=0)sh.getRange(row,i+1).setValue(v);};
+  const formula=(n,url,label)=>{const i=idx(n);if(i>=0)sh.getRange(row,i+1).setFormula(`=HYPERLINK("${url}","${label}")`);};
+  const url=page=>`${base}?page=${page}&emp=${encodeURIComponent(code)}`;
+  if(!read('BRAND_NAME')) write('BRAND_NAME','Divyanshi Capital');
+  if(!read('ACTIVE_STATUS')) write('ACTIVE_STATUS','PENDING_SETUP');
+  if(!read('CREATED_AT')) write('CREATED_AT',new Date());
+  if(!read('WHATSAPP_VERIFIED')) write('WHATSAPP_VERIFIED','PENDING_VERIFICATION');
+  if(!read('TELEGRAM_STATUS')) write('TELEGRAM_STATUS','PENDING_VERIFICATION');
+  if(!read('P1_AVATAR_URL')) write('P1_AVATAR_URL',`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=200`);
+  if(!base){write('P1_SYNC_STATUS','WEB_APP_URL_REQUIRED');write('UPDATED_AT',new Date());return {ok:false,pending:true,err:'Web App URL missing'};}
+  formula('P1_WEBSITE_URL',url('home'),'🌐 Employee Website');
+  formula('P1_DIGITAL_CARD_URL',url('card'),'💼 Digital Card');
+  formula('P1_SMART_FORM_URL',url('form'),'📝 Apply Link');
+  formula('P1_DASHBOARD_URL',url('dashboard'),'🔐 Staff Login');
+  write('P1_QR_TEXT',url('card'));
+  write('P1_SYNC_STATUS','CONNECTED');write('P1_LAST_SYNC_AT',new Date());write('UPDATED_AT',new Date());
   INVALIDATE_ALL_CACHES_();
-  styleHeaderRow_(sh, sh.getLastColumn());
-  Logger.log(`✅ Links mapped: ${updated} employees`);
-  return `HTML links mapped: ${updated}`;
+  return {ok:true,empCode:code};
+}
+
+function P1_NORMALIZE_ALL_EMPLOYEES_() {
+  const sh=SHEET_('ALL_EMPLOYEES'); if(!sh)throw new Error('ALL_EMPLOYEES missing');
+  P1_ENSURE_HEADERS_(sh,P1_EMPLOYEE_HEADERS_());
+  const last=sh.getLastRow(); if(last<2)return 'ALL_EMPLOYEES schema ready; add employee rows to provision links.';
+  let updated=0,pending=0;
+  for(let row=2;row<=last;row++){const r=P1_SYNC_EMPLOYEE_ROW_(sh,row);if(r.ok)updated++;else if(r.pending)pending++;}
+  styleHeaderRow_(sh,sh.getLastColumn());
+  Logger.log(`✅ Employee automation: ${updated} connected, ${pending} pending core fields/configuration`);
+  return `Employee automation complete: ${updated} connected, ${pending} pending`;
 }
 
 function HEALTH_CHECK_() {
@@ -2079,6 +2115,39 @@ function P1_GET_AVATAR_PROFILE_(empCode) {
   } catch(err){ LOG_ERR_('P1_GET_AVATAR_PROFILE',empCode,err.message); return {ok:false,err:err.message}; }
 }
 
+/* ── Public employee mini-site data. Keep this separate from staff operational data. ── */
+function P1_GET_PUBLIC_CARD_PROFILE_(empCode) {
+  try {
+    empCode=String(empCode||'').trim().toUpperCase();
+    const emp=FIND_EMPLOYEE_FULL_(empCode); if(!emp)return null;
+    const base=P1_GET_EXEC_URL_(), e=encodeURIComponent(empCode);
+    const name=String(emp.NAME||empCode).trim(), role=String(emp.ROLE||'Loan Advisor').trim();
+    const greeting=String(emp.AVATAR_GREETING||emp.GREETING||`Namaste! Main ${name} hoon — Divyanshi Capital mein aapka dedicated loan advisor.`).trim();
+    const tagline=String(emp.AVATAR_TAGLINE||`${role} — Divyanshi Capital`).trim();
+    return {
+      ok:true, empCode, name, role, dept:String(emp.DEPARTMENT||'').trim(),
+      mobile:String(emp.MOBILE||'').trim(), whatsapp:String(emp.WHATSAPP||emp.MOBILE||'').trim(),
+      email:String(emp.EMAIL||'').trim(), tgChatId:String(emp.TG_USERNAME||'').replace(/^@/,''),
+      profilePic:String(emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=200`).trim(),
+      greeting, tagline, bot:P1_EMPLOYEE_PERSONA_(emp), companyUrl:'https://www.divyanshicapital.com',
+      formLink:`${base}?page=form&emp=${e}&source=employee_card`
+    };
+  } catch(e){ LOG_ERR_('P1_GET_PUBLIC_CARD_PROFILE',empCode,e.message); return null; }
+}
+
+/* Public card chat is advisory-only: it never reads CRM, identifies cases, or executes commands. */
+function P1_PUBLIC_CARD_CHAT(payload) {
+  payload=payload||{};
+  const message=String(payload.message||'').trim().slice(0,700);
+  const emp=P1_GET_PUBLIC_CARD_PROFILE_(payload.empCode);
+  if(!message)return {ok:false,err:'Please enter a question.'};
+  const advisor=emp?`${emp.name}, ${emp.role}`:'a Divyanshi Capital team member';
+  const persona=emp&&emp.bot?emp.bot:{title:'Divyanshi Capital Assistant',greeting:'Namaste! How can I help?',instruction:'You support general public questions only.'};
+  const products=GET_ACTIVE_LOAN_PRODUCTS_().map(p=>p.name).slice(0,8).join(', ');
+  const system='You are Bulbhul, the public assistant for '+advisor+' at Divyanshi Capital. '+persona.instruction+' Mirror the visitor\'s language (Hindi, English, or Hinglish), be warm and professional, and keep normal replies under 90 words. Available lending products: '+products+'. Never access case records, request sensitive identity numbers, OTPs, passwords, PINs, card data, or banking credentials. Never take operational actions.';
+  return {ok:true,reply:MULTI_BRAIN_REPLY_(message,system)};
+}
+
 /* ── Loan post caption generator ── */
 function GENERATE_LOAN_POST_(empCode, loanType, sourceName, customMsg) {
   try {
@@ -2229,8 +2298,8 @@ function get_boot_data(payload) {
     emp: emp,
     products: GET_ACTIVE_LOAN_PRODUCTS_(),
     banks: P1_GET_BANK_OPTIONS_MAP_(),
-    staff: emp ? P1_GET_STAFF_PUBLIC_DATA_(emp) : null,
-    avatar: (page === 'card' && emp) ? P1_GET_AVATAR_PROFILE_(emp) : null,
+    staff: emp ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
+    avatar: (page === 'card' && emp) ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
     dashboard: (page === 'dashboard' && emp) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
   };
 }
