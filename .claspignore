@@ -11,3 +11,4 @@ SETUP.md
 SETUP_PROPERTIES.gs
 deploy.sh
 setup-github-secrets.sh
+apps-script-properties.example.json
