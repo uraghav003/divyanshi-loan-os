@@ -1371,6 +1371,11 @@ function onEdit(e) {
       } catch(_){}
     }
 
+    // ALL_EMPLOYEES: auto-provision P1 links + columns when EMP_CODE + NAME filled
+    if(name==='ALL_EMPLOYEES'){
+      try { P1_AUTO_PROVISION_EMP_ROW_(sh, row); } catch(_){}
+    }
+
     // HR_MD_APPROVAL: flag approved staff
     if(name==='HR_MD_APPROVAL'){
       try {
@@ -1388,6 +1393,106 @@ function onEdit(e) {
       } catch(_){}
     }
   } catch(err){ LOG_ERR_('onEdit','',err.message); }
+}
+
+/* ----------------------------------------------------------------
+   AUTO-PROVISION: called from onEdit when ANY cell in ALL_EMPLOYEES
+   is edited. If EMP_CODE + NAME filled and not yet CONNECTED → runs
+   full column setup for that row only (single-row, <3s).
+   ---------------------------------------------------------------- */
+function P1_AUTO_PROVISION_EMP_ROW_(sh, row) {
+  // Read headers once
+  const lastCol = Math.max(sh.getLastColumn(), 1);
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(DC_NORM_);
+
+  const iCode   = headers.indexOf('EMP_CODE');
+  const iName   = headers.indexOf('EMPLOYEES_NAME');
+  const iSync   = headers.indexOf('P1_SYNC_STATUS');
+  if (iCode < 0) return; // sheet not ready yet
+
+  // Read the row
+  const rowVals = sh.getRange(row, 1, 1, lastCol).getValues()[0];
+  const empCode = String(rowVals[iCode] || '').trim().toUpperCase();
+  const empName = String(iName >= 0 ? rowVals[iName] || '' : '').trim();
+
+  // Must have both EMP_CODE and NAME; skip if already CONNECTED
+  if (!empCode || !empName) return;
+  if (iSync >= 0 && String(rowVals[iSync] || '').toUpperCase() === 'CONNECTED') return;
+
+  const base = P1_GET_EXEC_URL_();
+  if (!base) return; // not deployed yet
+  const e    = encodeURIComponent(empCode);
+  const now  = new Date();
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(empName)}&background=d4af37&color=0a2540&size=160`;
+
+  // Column definitions: [colName, value_or_formula]
+  // We only write if column exists OR create it
+  const COLS = [
+    ['P1_WEBSITE_URL',     `=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`],
+    ['P1_SMART_FORM_URL',  `=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`],
+    ['P1_DIGITAL_CARD_URL',`=HYPERLINK("${base}?page=card&emp=${e}","🪪 Card")`],
+    ['P1_DASHBOARD_URL',   `=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`],
+    ['P1_CALLING_URL',     `=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`],
+    ['P1_VOICE_URL',       `=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`],
+    ['P1_QR_TEXT',         `${base}?page=card&emp=${e}`],
+    ['P1_AVATAR_URL',      avatar],
+    ['P1_SYNC_STATUS',     'CONNECTED'],
+    ['P1_LAST_SYNC_AT',    now],
+    ['ACTIVE_STATUS',      ''],  // only write if blank
+    ['WHATSAPP_VERIFIED',  ''],  // filled later via WA bot
+    ['TELEGRAM_CHAT_ID',   ''],  // filled later via TG bot
+  ];
+
+  // Build current header state (may grow)
+  const liveHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_);
+
+  COLS.forEach(([colName, val]) => {
+    const norm = DC_NORM_(colName);
+    let ci = liveHeaders.indexOf(norm);
+    if (ci < 0) {
+      // Create new column header
+      ci = sh.getLastColumn();
+      sh.getRange(1, ci + 1).setValue(colName).setFontWeight('bold').setBackground('#d4af37');
+      liveHeaders.push(norm);
+    }
+    const cell = sh.getRange(row, ci + 1);
+    // For placeholder-only cols (ACTIVE_STATUS, WA, TG): only write if empty
+    const placeholderOnly = ['ACTIVE_STATUS','WHATSAPP_VERIFIED','TELEGRAM_CHAT_ID'].includes(colName);
+    if (placeholderOnly) {
+      if (cell.getValue() === '' || cell.getValue() === null) {
+        if (colName === 'ACTIVE_STATUS') cell.setValue('YES');
+        // WA and TG left blank — bots fill later
+      }
+      return;
+    }
+    if (typeof val === 'string' && val.startsWith('=')) cell.setFormula(val);
+    else cell.setValue(val);
+  });
+
+  // Highlight row green to indicate provisioned
+  try { sh.getRange(row, 1, 1, sh.getLastColumn()).setBackground('#d9ead3'); } catch(_){}
+
+  // Invalidate emp cache so next doGet picks up new employee
+  try { CLEAR_EMP_CACHE_(); } catch(_){}
+
+  // TG admin alert
+  try {
+    const mobile = (() => {
+      const iM = liveHeaders.indexOf('MOBILE');
+      return iM >= 0 ? String(sh.getRange(row, iM + 1).getValue() || '') : '';
+    })();
+    const dept   = (() => {
+      const iD = liveHeaders.indexOf('DEPARTMENT');
+      return iD >= 0 ? String(sh.getRange(row, iD + 1).getValue() || '') : '';
+    })();
+    DC_SEND_TG_(
+      `✅ *NEW EMPLOYEE AUTO-PROVISIONED*\n` +
+      `👤 ${empName} | 🆔 ${empCode}\n` +
+      `🏢 Dept: ${dept || '—'} | 📱 ${mobile || '—'}\n` +
+      `🔗 Card: ${base}?page=card&emp=${e}\n` +
+      `📌 Status: CONNECTED | Telegram & WhatsApp pending bot link`
+    );
+  } catch(_){}
 }
 
 function P1_FORM_SUBMIT(e) {
