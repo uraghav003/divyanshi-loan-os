@@ -364,7 +364,7 @@ function renderCard(){
     +'<section class="card-services"><div class="card-services-head"><div><div class="slabel">How '+safe(s.name||'your advisor')+' can help</div><h3>Choose your loan path.</h3></div><p>Every option keeps this employee referral attached, so your application starts with the right advisor.</p></div><div class="card-product-grid">'+services+'</div></section>'
     +'<div class="card-login-link" onclick="openStaffLogin()">Employee login</div>'
   +'</div></div>'
-  +'<div class="login-overlay" id="loginOverlay"><div class="login-box"><h3>Staff Login</h3><p>Enter your EMP code and PIN to open your dashboard.</p><input id="liEmp" placeholder="EMP Code, e.g. DC002" style="text-transform:uppercase"><input id="liPin" type="password" placeholder="PIN" maxlength="10" onkeypress="if(event.key===\'Enter\')submitStaffLogin()"><div class="lb-actions"><button class="lb-cancel" onclick="closeStaffLogin()">Cancel</button><button class="lb-submit" id="liBtn" onclick="submitStaffLogin()">Login</button></div><div class="lb-msg" id="liMsg"></div></div></div>');
+  +'<div class="login-overlay" id="loginOverlay"><div class="login-box"><h3 id="loginTitle">Staff Login</h3><p id="loginHelp">Enter your EMP code and password to open your dashboard.</p><input id="liEmp" placeholder="EMP Code, e.g. DC002" style="text-transform:uppercase"><input id="liPin" type="password" placeholder="Password" maxlength="64" onkeypress="if(event.key===\'Enter\')submitStaffLogin()"><div id="changePasswordFields" style="display:none"><input id="liNewPassword" type="password" placeholder="New password (minimum 8 characters)" maxlength="64"><input id="liConfirmPassword" type="password" placeholder="Confirm new password" maxlength="64"></div><div class="lb-actions"><button class="lb-cancel" onclick="closeStaffLogin()">Cancel</button><button class="lb-submit" id="liBtn" onclick="submitStaffLogin()">Login</button></div><button type="button" class="lb-cancel" id="changePasswordToggle" style="width:100%;margin-top:10px" onclick="togglePasswordChange()">Change password</button><div class="lb-msg" id="liMsg"></div></div></div>');
   var liEmpEl=document.getElementById('liEmp');if(liEmpEl&&EMP&&EMP!=='EMP_CODE')liEmpEl.value=EMP;
 }
 function renderDashboard(){
@@ -448,13 +448,20 @@ function openStaffLogin(){
 function closeStaffLogin(){
   var ov=document.getElementById('loginOverlay');if(ov)ov.classList.remove('active');
 }
+function togglePasswordChange(){
+  var fields=document.getElementById('changePasswordFields'),title=document.getElementById('loginTitle'),help=document.getElementById('loginHelp'),btn=document.getElementById('liBtn'),toggle=document.getElementById('changePasswordToggle'),msg=document.getElementById('liMsg');
+  var change=fields&&fields.style.display==='none';if(!fields)return;fields.style.display=change?'block':'none';
+  title.textContent=change?'Change password':'Staff Login';help.textContent=change?'Enter your current password, then choose a new password.':'Enter your EMP code and password to open your dashboard.';btn.textContent=change?'Save password':'Login';toggle.textContent=change?'Back to login':'Change password';if(msg){msg.textContent='';msg.className='lb-msg';}
+}
 function submitStaffLogin(){
   var empEl=document.getElementById('liEmp'),pinEl=document.getElementById('liPin'),msg=document.getElementById('liMsg'),btn=document.getElementById('liBtn');
   var code=(empEl&&empEl.value||'').trim().toUpperCase();
   var pin=(pinEl&&pinEl.value||'').trim();
+  var changing=document.getElementById('changePasswordFields')&&document.getElementById('changePasswordFields').style.display!=='none';
   if(!code){msg.className='lb-msg err';msg.textContent='Enter your EMP code.';return;}
   if(!pin){msg.className='lb-msg err';msg.textContent='Enter your PIN.';return;}
-  if(!hasGAS()){msg.className='lb-msg err';msg.textContent='Preview mode — open the deployed Web App to login.';return;}
+  if(!hasGAS()){msg.className='lb-msg err';msg.textContent='Preview mode — open the deployed Web App to continue.';return;}
+  if(changing){var next=(document.getElementById('liNewPassword').value||''),confirm=(document.getElementById('liConfirmPassword').value||'');if(next!==confirm){msg.className='lb-msg err';msg.textContent='New passwords do not match.';return;}btn.disabled=true;btn.textContent='Saving...';callGAS('P1_CHANGE_EMP_PASSWORD',{empCode:code,currentPassword:pin,newPassword:next,accessToken:ACCESS_TOKEN}).then(function(res){btn.disabled=false;btn.textContent='Save password';if(res&&res.ok){try{sessionStorage.removeItem('p1_access_'+code);}catch(_){}msg.className='lb-msg ok';msg.textContent=res.message||'Password changed. Please sign in again.';pinEl.value='';document.getElementById('liNewPassword').value='';document.getElementById('liConfirmPassword').value='';}else{msg.className='lb-msg err';msg.textContent=(res&&res.err)||'Password change failed';}}).catch(function(err){btn.disabled=false;btn.textContent='Save password';msg.className='lb-msg err';msg.textContent=err&&err.message?err.message:'Connection failed';});return;}
   btn.disabled=true;btn.textContent='Verifying...';msg.className='lb-msg';msg.textContent='';
   callGAS('P1_VERIFY_EMP',{empCode:code,pin:pin}).then(function(res){
     btn.disabled=false;btn.textContent='Login';

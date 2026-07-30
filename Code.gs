@@ -2316,6 +2316,19 @@ function P1_RECORD_AUTH_FAILURE_(empCode) {
   SC_.put(key, String(attempts), attempts >= 5 ? 900 : 900);
 }
 function P1_CLEAR_AUTH_FAILURES_(empCode) { SC_.remove(P1_AUTH_FAILURE_KEY_(empCode)); }
+
+function P1_PASSWORD_MATCHES_(emp, password) {
+  const props=PropertiesService.getScriptProperties();
+  const hashKey='PIN_HASH_'+emp.EMP_CODE, saltKey='PIN_SALT_'+emp.EMP_CODE;
+  const storedHash=String(props.getProperty(hashKey)||''), legacy=String(props.getProperty('PIN_'+emp.EMP_CODE)||'');
+  if(storedHash) return P1_PIN_DIGEST_(emp.EMP_CODE,password,props.getProperty(saltKey))===storedHash;
+  // Migrate the pre-existing HR-managed credential on first successful use.
+  if(!legacy || password!==legacy)return false;
+  const salt=Utilities.getUuid();
+  props.setProperties({[hashKey]:P1_PIN_DIGEST_(emp.EMP_CODE,password,salt),[saltKey]:salt});
+  props.deleteProperty('PIN_'+emp.EMP_CODE);
+  return true;
+}
 function P1_VALIDATE_ACCESS_(empCode, token) {
   try {
     const code = String(empCode || '').trim().toUpperCase();
@@ -2331,27 +2344,30 @@ function P1_VERIFY_EMP(payload) {
   const emp = FIND_EMPLOYEE_FULL_(String(payload.empCode || '').toUpperCase());
   if (!emp) return { ok: false, err: 'Invalid employee code or PIN' };
   if (P1_IS_AUTH_THROTTLED_(emp.EMP_CODE)) return { ok: false, err: 'Too many attempts. Please wait 15 minutes and try again.' };
-  const props = PropertiesService.getScriptProperties();
-  const hashKey = 'PIN_HASH_' + emp.EMP_CODE;
-  const saltKey = 'PIN_SALT_' + emp.EMP_CODE;
-  const storedHash = String(props.getProperty(hashKey) || '');
-  const storedPin = String(props.getProperty('PIN_' + emp.EMP_CODE) || '');
   const pin = String(payload.pin || '').trim();
-  let valid = false;
-  if (pin && storedHash) valid = P1_PIN_DIGEST_(emp.EMP_CODE, pin, props.getProperty(saltKey)) === storedHash;
-  // One-time migration of a PIN already configured by HR. Shared/default/mobile PINs are never accepted.
-  if (!valid && pin && !storedHash && storedPin && pin === storedPin) {
-    const salt = Utilities.getUuid();
-    props.setProperties({[hashKey]: P1_PIN_DIGEST_(emp.EMP_CODE, pin, salt), [saltKey]: salt});
-    props.deleteProperty('PIN_' + emp.EMP_CODE);
-    valid = true;
-  }
+  const valid = !!pin && P1_PASSWORD_MATCHES_(emp,pin);
   if (!valid) {
     P1_RECORD_AUTH_FAILURE_(emp.EMP_CODE);
     return { ok: false, err: 'Invalid employee code or PIN' };
   }
   P1_CLEAR_AUTH_FAILURES_(emp.EMP_CODE);
   return { ok: true, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE), err: '' };
+}
+
+function P1_CHANGE_EMP_PASSWORD(payload) {
+  payload=payload||{};
+  const emp=FIND_EMPLOYEE_FULL_(String(payload.empCode||'').trim().toUpperCase());
+  const current=String(payload.currentPassword||'').trim(), next=String(payload.newPassword||'');
+  if(!emp) return {ok:false,err:'Invalid employee code or password.'};
+  if(P1_IS_AUTH_THROTTLED_(emp.EMP_CODE)) return {ok:false,err:'Too many attempts. Please wait 15 minutes and try again.'};
+  if(next.length<8||next.length>64) return {ok:false,err:'New password must be 8–64 characters.'};
+  if(!current||!P1_PASSWORD_MATCHES_(emp,current)){P1_RECORD_AUTH_FAILURE_(emp.EMP_CODE);return {ok:false,err:'Invalid employee code or password.'};}
+  if(current===next) return {ok:false,err:'Choose a different new password.'};
+  const props=PropertiesService.getScriptProperties(),salt=Utilities.getUuid();
+  props.setProperties({['PIN_HASH_'+emp.EMP_CODE]:P1_PIN_DIGEST_(emp.EMP_CODE,next,salt),['PIN_SALT_'+emp.EMP_CODE]:salt});
+  props.deleteProperty('PIN_'+emp.EMP_CODE); P1_CLEAR_AUTH_FAILURES_(emp.EMP_CODE);
+  if(payload.accessToken) SC_.remove('ACCESS_'+String(payload.accessToken).trim());
+  return {ok:true,message:'Password changed. Please sign in again.'};
 }
 
 /* ── index.html: callGAS('get_boot_data', {empCode,page}) ── */
