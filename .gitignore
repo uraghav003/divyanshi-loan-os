@@ -2,5 +2,6 @@ node_modules/
 .env
 dist/
 build/
+artifacts/
 *.log
 work/

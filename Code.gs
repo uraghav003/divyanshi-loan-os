@@ -192,7 +192,6 @@ function GET_OR_CREATE_(name) {
   return newSh;
 }
 
-function P1_GET_OR_CREATE_SHEET_(name) { return GET_OR_CREATE_(name); }
 
 function P1_OPEN_SS_SAFE_(fileId) {
   for (let i = 1; i <= 2; i++) {   // reduced to 2 retries (was 3)
@@ -772,7 +771,6 @@ function DC_PROCESS_LEAD_(lead) {
     // Stage 4: AI credit analysis
     let aiAdvice='';
     try {
-      let ctx = "[LIVE PRODUCTS]:\n";
       const aiPrompt='[LEAD]\n'+JSON.stringify({name:lead.CLIENT_NAME,mobile:lead.CLIENT_MOBILE,loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,emp:lead.EMP_CODE,remarks:lead.REMARKS},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
       const aiSys=BULBHUL_SYS_BASE_+'\n\nTask: Credit analysis. 4 sections:\n#### CIBIL Requirements:\n#### Matching Banks:\n#### Red Flags:\n#### Next Steps:';
       aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys);
@@ -1005,14 +1003,14 @@ td.value{color:#111;font-weight:500}
     // ── 2. TELEGRAM ──
     try {
       const tgMsg = `🆕 *NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━━━━━━━\n🪪 *Lead ID:* ${lead.LEAD_ID || 'N/A'}\n👤 *Client:* ${lead.CLIENT_NAME || 'N/A'}\n📱 *Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n💳 *Loan:* ${lead.LOAN_TYPE || 'N/A'}\n💰 *Amount:* ${amountDisplay}\n🏦 *Bank:* ${bank}\n⏱ *TAT:* ${tatDays} days\n⚠ *Deadline:* ${fmtDeadline}\n👔 *Owner:* ${ownerName} (${ownerCode})\n📋 *Remarks:* ${String(lead.REMARKS || 'No remarks').slice(0,120)}\n━━━━━━━━━━━━━━━━━━━━\n🤖 *Bulbhul AI:*\n${aiText.slice(0,350)}`;
-      if (typeof DC_SEND_TG_ === 'function') DC_SEND_TG_(tgMsg);
+      DC_SEND_TG_(tgMsg);
     } catch (e) { LOG_ERR_('NOTIFY_TG', lead.LEAD_ID || '', e.message); }
 
     // ── 3. WHATSAPP ──
     try {
       if (emp && emp.WHATSAPP && String(emp.WHATSAPP_VERIFIED || '').toUpperCase() === 'YES') {
         const waMsg = `*NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━\n*Lead ID:* ${lead.LEAD_ID || 'N/A'}\n*Client:* ${lead.CLIENT_NAME || 'N/A'}\n*Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n*Loan:* ${lead.LOAN_TYPE || 'N/A'}\n*Amount:* ${amountDisplay}\n*Bank:* ${bank}\n*TAT:* ${tatDays} days\n*Deadline:* ${fmtDeadline}\n*Owner:* ${ownerName} (${ownerCode})\n━━━━━━━━━━━━━━\n*Bulbhul:* ${aiText.slice(0,200)}`;
-        if (typeof DC_SEND_WA_ === 'function') DC_SEND_WA_(emp.WHATSAPP, waMsg);
+        DC_SEND_WA_(emp.WHATSAPP, waMsg);
       }
     } catch (e) { LOG_ERR_('NOTIFY_WA', lead.LEAD_ID || '', e.message); }
 
@@ -1098,6 +1096,57 @@ function DC_SEND_RCS_SINGLE_(mobile, data, cfg) {
     return false;
   }
 }
+function SEND_TG_LEAD_ALERT_(lead, emp) {
+  try {
+    lead = lead || {};
+    const name = emp ? emp.NAME : (lead.SALES_NAME || 'Unassigned');
+    const code = lead.EMP_CODE || '—';
+    const amt  = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
+    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
+    const msg =
+      `🆕 *NEW LEAD*\n` +
+      `📋 ID: ${lead.LEAD_ID || 'N/A'}\n` +
+      `👤 ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
+      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
+      `🏦 ${lead.PREFERRED_BANK || 'N/A'} | ⏱ TAT: ${lead.TAT_DAYS || 7}d\n` +
+      `👔 Owner: ${name} (${code})\n` +
+      `📌 ${String(lead.REMARKS || 'No remarks').slice(0, 120)}`;
+    DC_SEND_TG_(msg);
+  } catch (e) { LOG_ERR_('SEND_TG_LEAD_ALERT', (lead && lead.LEAD_ID) || '', e.message); }
+}
+
+function NOTIFY_ACCOUNTS_ON_DISBURSE_(lead) {
+  try {
+    lead = lead || {};
+    const amt = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
+    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
+    const msg =
+      `✅ *DISBURSAL COMPLETE*\n` +
+      `📋 Lead: ${lead.LEAD_ID || 'N/A'}\n` +
+      `👤 Client: ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
+      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
+      `🏦 Bank: ${lead.PREFERRED_BANK || 'N/A'}\n` +
+      `👔 Owner: ${lead.SALES_NAME || 'N/A'} (${lead.EMP_CODE || '—'})`;
+
+    // Log to ACCOUNTS_LOG sheet
+    const sh = GET_OR_CREATE_('ACCOUNTS_LOG');
+    P1_ENSURE_HEADERS_(sh, P1_TAB_MAP.ACCOUNTS_LOG());
+    sh.appendRow(P1_BUILD_ROW_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_), lead));
+
+    // Notify via TG
+    const tgToken = DC_CFG.TG_TOKEN;
+    const acctId = PropertiesService.getScriptProperties().getProperty('ACCOUNTS_TG_CHAT_ID') || '';
+    if (tgToken && acctId) DC_SEND_TG_MESSAGE_(acctId, msg);
+    else DC_SEND_TG_(msg);
+
+    // Notify accounts email
+    if (MailApp.getRemainingDailyQuota() > 0) {
+      MailApp.sendEmail(DC_CFG.COMPANY.ACCOUNTS_EMAIL, `[DISBURSAL] ${lead.LEAD_ID || ''} — ${lead.CLIENT_NAME || ''}`,
+        `Disbursal logged.\n\nLead: ${lead.LEAD_ID}\nClient: ${lead.CLIENT_NAME} | ${lead.CLIENT_MOBILE}\nLoan: ${lead.LOAN_TYPE} | ${amtStr}\nBank: ${lead.PREFERRED_BANK}\nOwner: ${lead.SALES_NAME} (${lead.EMP_CODE})\n\n— Bulbhul AI`);
+    }
+  } catch (e) { LOG_ERR_('NOTIFY_ACCOUNTS_ON_DISBURSE', (lead && lead.LEAD_ID) || '', e.message); }
+}
+
 /* ================================================================
    SECTION 14 — MESSAGING SERVICES
    ================================================================ */
@@ -1328,7 +1377,7 @@ function P1_GET_STAFF_PUBLIC_DATA_(empCode) {
     const base=P1_GET_EXEC_URL_(),e=encodeURIComponent(empCode);
     const avatar=emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(emp.NAME||empCode)}&background=d4af37&color=0a2540&size=160`;
     const at=encodeURIComponent(P1_MINT_ACCESS_TOKEN_(empCode));
-    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
+    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',whatsapp:emp.WHATSAPP||emp.MOBILE||'',tgChatId:emp.TG_CHAT_ID||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
   } catch(e){ LOG_ERR_('P1_GET_STAFF_PUBLIC_DATA',empCode,e.message); return null; }
 }
 
@@ -1396,11 +1445,16 @@ function onEdit(e) {
       } catch(_){}
     }
 
+    // ALL_EMPLOYEES: auto-provision P1 links + columns when EMP_CODE + NAME filled
+    if(name==='ALL_EMPLOYEES'){
+      try { P1_AUTO_PROVISION_EMP_ROW_(sh, row); } catch(_){}
+    }
+
     // HR_MD_APPROVAL: flag approved staff
     if(name==='HR_MD_APPROVAL'){
       try {
         const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
-        const iS=h.indexOf('CASE_CATEGORY'),iE=h.indexOf('EMP_CODE'),iO=h.indexOf('ONBOARD_DONE');
+        const iS=h.indexOf('STATUS'),iE=h.indexOf('EMP_CODE'),iO=h.indexOf('ONBOARD_DONE');
         if(col===iS+1){
           const st=String(sh.getRange(row,iS+1).getValue()||'').toUpperCase();
           const ec=String(iE>-1?sh.getRange(row,iE+1).getValue():'').toUpperCase();
@@ -1413,6 +1467,106 @@ function onEdit(e) {
       } catch(_){}
     }
   } catch(err){ LOG_ERR_('onEdit','',err.message); }
+}
+
+/* ----------------------------------------------------------------
+   AUTO-PROVISION: called from onEdit when ANY cell in ALL_EMPLOYEES
+   is edited. If EMP_CODE + NAME filled and not yet CONNECTED → runs
+   full column setup for that row only (single-row, <3s).
+   ---------------------------------------------------------------- */
+function P1_AUTO_PROVISION_EMP_ROW_(sh, row) {
+  // Read headers once
+  const lastCol = Math.max(sh.getLastColumn(), 1);
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(DC_NORM_);
+
+  const iCode   = headers.indexOf('EMP_CODE');
+  const iName   = headers.indexOf('EMPLOYEES_NAME');
+  const iSync   = headers.indexOf('P1_SYNC_STATUS');
+  if (iCode < 0) return; // sheet not ready yet
+
+  // Read the row
+  const rowVals = sh.getRange(row, 1, 1, lastCol).getValues()[0];
+  const empCode = String(rowVals[iCode] || '').trim().toUpperCase();
+  const empName = String(iName >= 0 ? rowVals[iName] || '' : '').trim();
+
+  // Must have both EMP_CODE and NAME; skip if already CONNECTED
+  if (!empCode || !empName) return;
+  if (iSync >= 0 && String(rowVals[iSync] || '').toUpperCase() === 'CONNECTED') return;
+
+  const base = P1_GET_EXEC_URL_();
+  if (!base) return; // not deployed yet
+  const e    = encodeURIComponent(empCode);
+  const now  = new Date();
+  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(empName)}&background=d4af37&color=0a2540&size=160`;
+
+  // Column definitions: [colName, value_or_formula]
+  // We only write if column exists OR create it
+  const COLS = [
+    ['P1_WEBSITE_URL',     `=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`],
+    ['P1_SMART_FORM_URL',  `=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`],
+    ['P1_DIGITAL_CARD_URL',`=HYPERLINK("${base}?page=card&emp=${e}","🪪 Card")`],
+    ['P1_DASHBOARD_URL',   `=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`],
+    ['P1_CALLING_URL',     `=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`],
+    ['P1_VOICE_URL',       `=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`],
+    ['P1_QR_TEXT',         `${base}?page=card&emp=${e}`],
+    ['P1_AVATAR_URL',      avatar],
+    ['P1_SYNC_STATUS',     'CONNECTED'],
+    ['P1_LAST_SYNC_AT',    now],
+    ['ACTIVE_STATUS',      ''],  // only write if blank
+    ['WHATSAPP_VERIFIED',  ''],  // filled later via WA bot
+    ['TELEGRAM_CHAT_ID',   ''],  // filled later via TG bot
+  ];
+
+  // Build current header state (may grow)
+  const liveHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_);
+
+  COLS.forEach(([colName, val]) => {
+    const norm = DC_NORM_(colName);
+    let ci = liveHeaders.indexOf(norm);
+    if (ci < 0) {
+      // Create new column header
+      ci = sh.getLastColumn();
+      sh.getRange(1, ci + 1).setValue(colName).setFontWeight('bold').setBackground('#d4af37');
+      liveHeaders.push(norm);
+    }
+    const cell = sh.getRange(row, ci + 1);
+    // For placeholder-only cols (ACTIVE_STATUS, WA, TG): only write if empty
+    const placeholderOnly = ['ACTIVE_STATUS','WHATSAPP_VERIFIED','TELEGRAM_CHAT_ID'].includes(colName);
+    if (placeholderOnly) {
+      if (cell.getValue() === '' || cell.getValue() === null) {
+        if (colName === 'ACTIVE_STATUS') cell.setValue('YES');
+        // WA and TG left blank — bots fill later
+      }
+      return;
+    }
+    if (typeof val === 'string' && val.startsWith('=')) cell.setFormula(val);
+    else cell.setValue(val);
+  });
+
+  // Highlight row green to indicate provisioned
+  try { sh.getRange(row, 1, 1, sh.getLastColumn()).setBackground('#d9ead3'); } catch(_){}
+
+  // Invalidate emp cache so next doGet picks up new employee
+  try { CLEAR_EMP_CACHE_(); } catch(_){}
+
+  // TG admin alert
+  try {
+    const mobile = (() => {
+      const iM = liveHeaders.indexOf('MOBILE');
+      return iM >= 0 ? String(sh.getRange(row, iM + 1).getValue() || '') : '';
+    })();
+    const dept   = (() => {
+      const iD = liveHeaders.indexOf('DEPARTMENT');
+      return iD >= 0 ? String(sh.getRange(row, iD + 1).getValue() || '') : '';
+    })();
+    DC_SEND_TG_(
+      `✅ *NEW EMPLOYEE AUTO-PROVISIONED*\n` +
+      `👤 ${empName} | 🆔 ${empCode}\n` +
+      `🏢 Dept: ${dept || '—'} | 📱 ${mobile || '—'}\n` +
+      `🔗 Card: ${base}?page=card&emp=${e}\n` +
+      `📌 Status: CONNECTED | Telegram & WhatsApp pending bot link`
+    );
+  } catch(_){}
 }
 
 function P1_FORM_SUBMIT(e) {
@@ -1491,9 +1645,10 @@ function DC_INSTALL_P1_FINAL_() {
   }
   // Make ALL_EMPLOYEES self-maintaining before staff links are shared.
   P1_NORMALIZE_ALL_EMPLOYEES_();
-  const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','onEdit','P1_FORM_SUBMIT'];
+  const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','WARM_CACHE_','onEdit','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
+  ScriptApp.newTrigger('WARM_CACHE_').timeBased().everyMinutes(8).create();
   ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
   ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
   try{ScriptApp.newTrigger('onEdit').forSpreadsheet(ss).onEdit().create();}catch(_){}
@@ -1613,6 +1768,7 @@ function doPost(e) {
     if (action === 'update_lead')      return jsonResp_(UPDATE_LEAD_STATUS_(payload.query, payload.status, payload.remark));
     if (action === 'run_mis')          { MIS_PIPELINE_RUN_(); return jsonResp_({ ok: true, msg: 'MIS triggered' }); }
     if (action === 'clear_cache')      { INVALIDATE_ALL_CACHES_(); return jsonResp_({ ok: true, msg: 'All caches cleared' }); }
+    if (action === 'sync_emp_links')   { const r=P1_MAP_HTML_LINKS_(); return jsonResp_({ ok: true, msg: r }); }
     if (action === 'get_avatar_profile') return jsonResp_(P1_GET_AVATAR_PROFILE_(payload.empCode));
     if (action === 'generate_post')    return jsonResp_(GENERATE_LOAN_POST_(payload.empCode, payload.loanType, payload.sourceName, payload.customMsg));
     if (action === 'post_facebook')    return jsonResp_(POST_TO_FACEBOOK_(payload.empCode, payload.message, payload.imageUrl));
@@ -1643,6 +1799,14 @@ function MANAGER_CHECKIN_API(d)       { return MANAGER_SELFIE_CHECKIN_(d.empCode
 function RUN_MIS_PIPELINE_NOW()       { MIS_PIPELINE_RUN_(); }
 function RUN_MIS_EVENING_REPORT()     { SEND_EVENING_MIS_REPORT_(); }
 function CLEAR_CACHE_NOW()            { INVALIDATE_ALL_CACHES_(); Logger.log('✅ All caches cleared'); }
+function SYNC_ALL_EMP_LINKS()         { return P1_MAP_HTML_LINKS_(); }
+
+// Pre-warms ScriptCache every 8 min so doGet cold-start is <1s
+function WARM_CACHE_() {
+  try { DC_BUILD_EMP_MAP_(); } catch(_){}
+  try { GET_ACTIVE_LOAN_PRODUCTS_(); } catch(_){}
+  try { P1_GET_BANK_OPTIONS_MAP_(); } catch(_){}
+}
 
 function P1_MAP_HTML_LINKS_() {
   const sh = SHEET_('ALL_EMPLOYEES');
@@ -2308,8 +2472,6 @@ function INSTALL_AVATAR_SOCIAL_SCHEMA_() {
   return 'AVATAR_SCHEMA_OK';
 }
 
-/* ── SYNC_ROLE_DASHBOARDS_ENGINE — legacy compatibility alias ── */
-function SYNC_ROLE_DASHBOARDS_ENGINE() { MIS_15MIN_FULL_SYNC_(); }
 
 /* ================================================================
    SECTION 25 — FRONTEND API SURFACE
