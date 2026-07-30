@@ -136,7 +136,7 @@
     .ai-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
     .ai-metric{text-align:center;background:rgba(255,255,255,.04);padding:10px 6px;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
     .ai-metric-val{font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--primary-light)}
-    .ai-metric-label{font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;}
+    .ai-metric-label{font-size:9px;font-weight:700;color:var(--text-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
     .ai-controls{display:flex;gap:8px}
     .ai-control-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;transition:var(--transition);display:flex;align-items:center;justify-content:center;gap:6px}
     .ai-control-btn.primary{background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:white}
@@ -166,6 +166,7 @@
     .list-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
     .tag{padding:2px 8px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
     .tag-hot{background:rgba(239,68,68,.15);color:var(--danger)}.tag-warm{background:rgba(245,158,11,.15);color:var(--warning)}.tag-cold{background:rgba(100,116,139,.15);color:var(--text-muted)}
+    .tag-open{background:rgba(59,130,246,.15);color:var(--info)}.tag-interested{background:rgba(34,197,94,.15);color:var(--success)}.tag-callback{background:rgba(245,158,11,.15);color:var(--warning)}.tag-no_answer{background:rgba(100,116,139,.15);color:var(--text-muted)}.tag-rejected{background:rgba(239,68,68,.15);color:var(--danger)}.tag-docs{background:rgba(201,168,76,.15);color:var(--primary)}
     .list-actions{display:flex;gap:6px;flex-shrink:0}
     .list-call-btn{width:34px;height:34px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:var(--transition);font-size:13px;background:rgba(201,168,76,.15);color:var(--primary)}
     .list-call-btn:hover{background:var(--primary);color:#000}
@@ -402,7 +403,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Client Mobile</label>
-        <input type="tel" id="formMobile" class="form-input" placeholder="Mobile Number" maxlength="10" inputmode="numeric">
+        <input type="tel" id="formMobile" class="form-input" placeholder="Mobile Number" maxlength="10" inputmode="numeric" readonly aria-readonly="true">
       </div>
       <div class="form-group">
         <label class="form-label">Agent Code</label>
@@ -516,7 +517,7 @@ function initLead() {
       runPreloader();
     })
     .withFailureHandler(function(err){showEmptyState(err&&err.message?err.message:'Connection failed');runPreloader();})
-    .P1_GET_CALLING_QUEUE({empCode: AGENT_CODE, accessToken: ACCESS_TOKEN});
+    .P1_GET_CALLING_QUEUE(AGENT_CODE,ACCESS_TOKEN);
 }
 
 function showEmptyState(message){
@@ -570,17 +571,7 @@ function initiateCall() {
   overlay.classList.add("active");
   window.open("tel:" + CURRENT_MOBILE, "_top");
   byId("overlayStatus").innerText = "Dialer opened — save the actual outcome after the call";startCallTimer();
-  if(hasBackend()) {
-    google.script.run
-      .withSuccessHandler(function(res) {
-        console.log('Call start logged:', res);
-      })
-      .withFailureHandler(function(err) {
-        console.error('P1_CALLING_START failed:', err);
-        showToast('Failed to log call start: ' + (err && err.message ? err.message : 'Unknown error'));
-      })
-      .P1_CALLING_START({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
-  }
+  if(hasBackend())google.script.run.P1_CALLING_START({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
 }
 
 function startCallTimer() {

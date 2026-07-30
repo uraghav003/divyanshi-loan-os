@@ -6,7 +6,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0B1F3A">
-  <title>Smart Intake | Divyanshi Capital</title>
+  <title>Divyanshi Capital AI Based OS — Smart Intake</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -307,7 +307,6 @@
     </div>
   </div>
 
-  <form id="smartIntakeForm" onsubmit="return false;">
   <div class="form-card one-page-mode" id="formCard">
     <div class="progress-wrap">
       <div class="progress-step active" data-num="1" id="stepDot1"></div>
@@ -323,7 +322,7 @@
       <div class="grid2">
         <div class="fg">
           <label>Entry Type</label>
-          <select id="entry_type" name="entry_type" onchange="toggleFields()">
+          <select id="entry_type" onchange="toggleFields()">
             <option value="SALES_LEAD">Sales Lead</option>
             <option value="CLIENT_ENTRY">Client Entry</option>
             <option value="NEW_STAFF_ENTRY">New Staff Entry</option>
@@ -543,7 +542,6 @@
       <span id="statusMsg"></span>
     </div>
   </div>
-</form>
 </div>
 
 <script>
@@ -597,16 +595,11 @@ function init() {
   setIf('source_name', p.get('source'));
   loadLoanData();
   if (isGASConnected()) {
-    google.script.run
-      .withSuccessHandler(function(cfg) {
-        if (cfg && cfg.tcUrl && $('tcLink')) $('tcLink').href = cfg.tcUrl;
-        if (cfg && cfg.privacyUrl && $('privacyLink')) $('privacyLink').href = cfg.privacyUrl;
-        if (cfg) { CONSENT_VERSION=String(cfg.consentVersion||''); PRIVACY_NOTICE_URL=String(cfg.privacyUrl||''); }
-      })
-      .withFailureHandler(function(err) {
-        console.error('P1_GET_HR_PUBLIC_CONFIG failed:', err);
-      })
-      .P1_GET_HR_PUBLIC_CONFIG();
+    google.script.run.withSuccessHandler(function(cfg) {
+      if (cfg && cfg.tcUrl && $('tcLink')) $('tcLink').href = cfg.tcUrl;
+      if (cfg && cfg.privacyUrl && $('privacyLink')) $('privacyLink').href = cfg.privacyUrl;
+      if (cfg) { CONSENT_VERSION=String(cfg.consentVersion||''); PRIVACY_NOTICE_URL=String(cfg.privacyUrl||''); }
+    }).P1_GET_HR_PUBLIC_CONFIG();
     requestUploadToken();
   }
   const df = $('docFiles');
