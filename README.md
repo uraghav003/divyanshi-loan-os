@@ -28,7 +28,7 @@ This folder is the only canonical Apps Script source. Older files and ZIPs outsi
 2. Deploy a new version of the existing Web App; do not create a second system.
 3. Run `SETUP_STANDALONE_()` and then `DC_INSTALL_P1_FINAL_()` once; approve the required permissions.
 4. Set `MALLIK_API_KEY` in Apps Script Properties and the matching AI Studio server secret. Never expose it in browser code.
-5. Set a unique per-employee PIN (`PIN_<EMP_CODE>` is migrated to a server-side hash at first successful sign-in). A shared `DEFAULT_PIN` is not supported.
+5. Set a unique per-employee password. For a master reset, set `PASSWORD_RESET_ALLOWED_EMAILS` in Script Properties to the comma-separated Google Workspace emails permitted to reset passwords. Then enter the new 8–64-character value in that employee's `PASSWORD_RESET_INPUT` cell in `ALL_EMPLOYEES`; the on-edit automation hashes it, clears the cell immediately, and records `PASSWORD_STATUS` plus `PASSWORD_CHANGED_AT`. Passwords are never stored or displayed in the sheet. A shared `DEFAULT_PIN` is not supported.
 6. Configure at least one approved AI provider key for live AI responses.
 7. Configure `FREEPBX_WEBHOOK_URL` and `FREEPBX_API_TOKEN` only when real voice calling is ready.
 8. Configure HR/branding/document properties listed by `technicalFixes()` as required.
