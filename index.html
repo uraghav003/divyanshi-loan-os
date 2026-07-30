@@ -268,7 +268,7 @@ function go(p){window.top.location.href=p.indexOf('?')===0?burl()+p:ru(p);}
 function callGAS(action,payload){
   return new Promise(function(res,rej){
     if(hasGAS()){google.script.run.withSuccessHandler(res).withFailureHandler(rej)[action](payload);}
-    else{fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action,payload:payload})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(res).catch(rej);}
+    else{rej(new Error('GAS not available'));}
   });
 }
 function hdr(){
