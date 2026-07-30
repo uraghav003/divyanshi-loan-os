@@ -1481,7 +1481,7 @@ function doGet(e) {
     if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Smart Intake | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     if(page==='calling')return HtmlService.createHtmlOutputFromFile('calling').setTitle('Bulbhul Calling | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     if(page==='voice')return HtmlService.createHtmlOutputFromFile('voice').setTitle('Bulbhul Voice | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),dashboard:page==='dashboard'?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
+    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),avatar:(page==='card'&&emp)?P1_GET_AVATAR_PROFILE_(emp):null,dashboard:page==='dashboard'?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
     html=html.split('__P1_BOOT_DATA_JSON__').join(JSON.stringify(bootData).replace(/</g,'\\u003c'));
     return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital — P1 Digital Duniya').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -1539,16 +1539,7 @@ function doPost(e) {
     if (action === 'post_instagram')   return jsonResp_(POST_TO_INSTAGRAM_(payload.empCode, payload.caption, payload.imageUrl));
     if (action === 'avatar_learn')     { AVATAR_LEARN_(payload.empCode, payload.type, payload.data || {}); return jsonResp_({ ok: true }); }
     if (action === 'voice_notify')     return jsonResp_(GET_VOICE_NOTIFICATION_(payload.event, payload.data));
-    if (action === 'verify_emp') {
-      const emp = FIND_EMPLOYEE_FULL_(String(payload.empCode || '').toUpperCase());
-      if (!emp) return jsonResp_({ ok: false, err: 'Employee not found' });
-      const storedPin = PropertiesService.getScriptProperties().getProperty('PIN_' + emp.EMP_CODE)
-                     || PropertiesService.getScriptProperties().getProperty('DEFAULT_PIN')
-                     || '1234';
-      const pin   = String(payload.pin || '').trim();
-      const valid = pin === storedPin || (emp.MOBILE && emp.MOBILE.slice(-4) === pin);
-      return jsonResp_({ ok: valid, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: valid ? P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE) : '', err: valid ? '' : 'Invalid PIN' });
-    }
+    if (action === 'verify_emp') return jsonResp_(P1_VERIFY_EMP(payload));
 
     return jsonResp_({ ok: false, err: 'Unknown action: ' + action });
 
@@ -2214,6 +2205,19 @@ function P1_VALIDATE_ACCESS_(empCode, token) {
   } catch (_) { return false; }
 }
 
+/* ── index.html: callGAS('P1_VERIFY_EMP', {empCode,pin}) — staff login on the personal card page ── */
+function P1_VERIFY_EMP(payload) {
+  payload = payload || {};
+  const emp = FIND_EMPLOYEE_FULL_(String(payload.empCode || '').toUpperCase());
+  if (!emp) return { ok: false, err: 'Employee not found' };
+  const storedPin = PropertiesService.getScriptProperties().getProperty('PIN_' + emp.EMP_CODE)
+                 || PropertiesService.getScriptProperties().getProperty('DEFAULT_PIN')
+                 || '1234';
+  const pin = String(payload.pin || '').trim();
+  const valid = !!pin && (pin === storedPin || (emp.MOBILE && emp.MOBILE.slice(-4) === pin));
+  return { ok: valid, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: valid ? P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE) : '', err: valid ? '' : 'Invalid PIN' };
+}
+
 /* ── index.html: callGAS('get_boot_data', {empCode,page}) ── */
 function get_boot_data(payload) {
   payload = payload || {};
@@ -2226,6 +2230,7 @@ function get_boot_data(payload) {
     products: GET_ACTIVE_LOAN_PRODUCTS_(),
     banks: P1_GET_BANK_OPTIONS_MAP_(),
     staff: emp ? P1_GET_STAFF_PUBLIC_DATA_(emp) : null,
+    avatar: (page === 'card' && emp) ? P1_GET_AVATAR_PROFILE_(emp) : null,
     dashboard: (page === 'dashboard' && emp) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
   };
 }
