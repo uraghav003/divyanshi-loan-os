@@ -1254,7 +1254,8 @@ function P1_GET_STAFF_PUBLIC_DATA_(empCode) {
     const emp=empCode?FIND_EMPLOYEE_FULL_(empCode):null; if(!emp)return null;
     const base=P1_GET_EXEC_URL_(),e=encodeURIComponent(empCode);
     const avatar=emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(emp.NAME||empCode)}&background=d4af37&color=0a2540&size=160`;
-    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}`};
+    const at=encodeURIComponent(P1_MINT_ACCESS_TOKEN_(empCode));
+    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
   } catch(e){ LOG_ERR_('P1_GET_STAFF_PUBLIC_DATA',empCode,e.message); return null; }
 }
 
@@ -1542,7 +1543,7 @@ function doPost(e) {
                      || '1234';
       const pin   = String(payload.pin || '').trim();
       const valid = pin === storedPin || (emp.MOBILE && emp.MOBILE.slice(-4) === pin);
-      return jsonResp_({ ok: valid, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, err: valid ? '' : 'Invalid PIN' });
+      return jsonResp_({ ok: valid, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: valid ? P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE) : '', err: valid ? '' : 'Invalid PIN' });
     }
 
     return jsonResp_({ ok: false, err: 'Unknown action: ' + action });
@@ -2185,3 +2186,233 @@ function INSTALL_AVATAR_SOCIAL_SCHEMA_() {
 
 /* ── SYNC_ROLE_DASHBOARDS_ENGINE — legacy compatibility alias ── */
 function SYNC_ROLE_DASHBOARDS_ENGINE() { MIS_15MIN_FULL_SYNC_(); }
+
+/* ================================================================
+   SECTION 25 — FRONTEND API SURFACE
+   Every function below is called directly via google.script.run from
+   index.html, smart_form.html, calling.html, or voice.html. Each one
+   exists because a specific client-side call site requires it —
+   see the html files' google.script.run chains for the call sites.
+   ================================================================ */
+
+/* ── Session tokens (ScriptCache-backed, 6h TTL — CacheService max) ── */
+function P1_MINT_ACCESS_TOKEN_(empCode) {
+  const token = Utilities.getUuid().replace(/-/g, '');
+  SC_.put('ACCESS_' + token, String(empCode || '').trim().toUpperCase(), 21600);
+  return token;
+}
+function P1_VALIDATE_ACCESS_(empCode, token) {
+  try {
+    const code = String(empCode || '').trim().toUpperCase();
+    const t = String(token || '').trim();
+    if (!code || !t) return false;
+    return SC_.get('ACCESS_' + t) === code;
+  } catch (_) { return false; }
+}
+
+/* ── index.html: callGAS('get_boot_data', {empCode,page}) ── */
+function get_boot_data(payload) {
+  payload = payload || {};
+  const emp  = String(payload.empCode || '').trim().toUpperCase();
+  const page = String(payload.page || 'home').trim().toLowerCase();
+  return {
+    baseUrl: P1_GET_EXEC_URL_(),
+    page: page,
+    emp: emp,
+    products: GET_ACTIVE_LOAN_PRODUCTS_(),
+    banks: P1_GET_BANK_OPTIONS_MAP_(),
+    staff: emp ? P1_GET_STAFF_PUBLIC_DATA_(emp) : null,
+    dashboard: (page === 'dashboard' && emp) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
+  };
+}
+
+/* ── index.html: callGAS('MLA_LOG_ACTIVITY', {type,empCode,amount}) ── */
+function MLA_LOG_ACTIVITY(payload) {
+  try {
+    payload = payload || {};
+    const sh = GET_OR_CREATE_('ACTIVITY_LOG');
+    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'TYPE', 'EMP_CODE', 'DETAILS']);
+    sh.appendRow([new Date(), String(payload.type || ''), String(payload.empCode || '').trim().toUpperCase(), JSON.stringify(payload).slice(0, 500)]);
+    return { ok: true };
+  } catch (e) { LOG_ERR_('MLA_LOG_ACTIVITY', '', e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── index.html: callGAS('DC_TG_BROADCAST', msg) ── */
+function DC_TG_BROADCAST(msg) {
+  try {
+    const sent = DC_SEND_TG_(String(msg || '').slice(0, 4000));
+    return sent ? 'Broadcast sent!' : 'No Telegram recipients configured yet.';
+  } catch (e) { LOG_ERR_('DC_TG_BROADCAST', '', e.message); return 'Broadcast failed: ' + e.message; }
+}
+
+/* ── smart_form.html: consent links + version shown on the intake form ── */
+function P1_GET_HR_PUBLIC_CONFIG() {
+  const p = PropertiesService.getScriptProperties();
+  return {
+    tcUrl: p.getProperty('TC_URL') || 'https://www.divyanshicapital.com/shop/terms-conditions/',
+    privacyUrl: p.getProperty('PRIVACY_URL') || 'https://www.divyanshicapital.com/privacy-policy/',
+    consentVersion: p.getProperty('CONSENT_VERSION') || 'v1'
+  };
+}
+
+/* ── smart_form.html: requestUploadToken() ── */
+function P1_ISSUE_UPLOAD_TOKEN(submissionKey, route) {
+  try {
+    const key = String(submissionKey || '').trim();
+    if (!key) throw new Error('submissionKey required');
+    const token = Utilities.getUuid().replace(/-/g, '');
+    SC_.put('UPLOAD_TOKEN_' + token, JSON.stringify({ key: key, route: String(route || '') }), 1800);
+    return token;
+  } catch (e) { LOG_ERR_('P1_ISSUE_UPLOAD_TOKEN', '', e.message); throw e; }
+}
+
+/* ── smart_form.html: loadLoanData() ── */
+function P1_GET_LOAN_CATALOG() {
+  return { products: GET_ACTIVE_LOAN_PRODUCTS_(), banks: P1_GET_BANK_OPTIONS_MAP_() };
+}
+
+/* ── calling.html: initLead() ── */
+function P1_GET_CALLING_QUEUE(empCode, accessToken) {
+  try {
+    empCode = String(empCode || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(empCode, accessToken)) return { ok: false, err: 'Session expired. Re-open Calling from your dashboard.' };
+    const emp = FIND_EMPLOYEE_FULL_(empCode);
+    if (!emp) return { ok: false, err: 'Employee not found' };
+    const role = String(emp.ROLE || '').toUpperCase();
+    const isLead = ['MANAGER', 'MD', 'FOUNDER', 'ADMIN'].some(r => role.includes(r));
+    let data = GET_MASTER_SNAPSHOT_();
+    if (!isLead) data = data.filter(r => String(r.EMP_CODE || '').toUpperCase() === empCode);
+    const closedStates = ['DISBURSE', 'DISBURSED', 'REJECT', 'REJECTED', 'NOT INTERESTED', 'WRONG NUMBER'];
+    const open = data.filter(r => !closedStates.includes(String(r.CASE_CATEGORY || '').toUpperCase()));
+    const today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
+    const doneToday = data.filter(r => {
+      try { return closedStates.includes(String(r.CASE_CATEGORY || '').toUpperCase()) && Utilities.formatDate(new Date(r.LAST_UPDATED || 0), 'Asia/Kolkata', 'yyyy-MM-dd') === today; }
+      catch (_) { return false; }
+    }).length;
+    const tatBreaches = data.filter(r => {
+      const cat = String(r.CASE_CATEGORY || '').toUpperCase();
+      if (closedStates.includes(cat)) return false;
+      return String(r.TAT_STATUS || '').toUpperCase() === 'TAT_BREACHED' || (r.TAT_DEADLINE && new Date(r.TAT_DEADLINE) < new Date());
+    }).length;
+    const queue = open.slice(0, 100).map(r => ({
+      leadId: r.LEAD_ID || '', clientName: r.CLIENT_NAME || '', mobile: r.CLIENT_MOBILE || '',
+      loanType: r.LOAN_TYPE || '', amount: r.REQUIRED_LOAN_AMOUNT || '', bank: r.PREFERRED_BANK || '',
+      status: r.CASE_CATEGORY || 'OPEN', remarks: r.REMARKS || '', tatStatus: r.TAT_STATUS || 'ACTIVE', empCode: r.EMP_CODE || ''
+    }));
+    const aiAvailable = !!(DC_CFG.DEEPSEEK_KEY || DC_CFG.OPENAI_KEY || DC_CFG.GEMINI_KEY);
+    const pending = open.length;
+    const performance = data.length ? Math.round(((data.length - pending) / data.length) * 100) : 0;
+    const tatHealth = data.length ? Math.round(((data.length - tatBreaches) / data.length) * 100) : 100;
+    return { ok: true, queue, stats: { pending, doneToday, tatBreaches, tatHealth, performance }, aiAvailable };
+  } catch (e) { LOG_ERR_('P1_GET_CALLING_QUEUE', empCode, e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── calling.html: AI-suggested disposition remark ── */
+function P1_CALLING_AI_REMARK(payload) {
+  payload = payload || {};
+  try {
+    const empCode = String(payload.empCode || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(empCode, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const leadId = String(payload.leadId || '').trim().toUpperCase();
+    const lead = GET_MASTER_SNAPSHOT_().find(r => String(r.LEAD_ID || '').toUpperCase() === leadId);
+    if (!lead) return { ok: false, err: 'Lead not found' };
+    const sys = BULBHUL_SYS_BASE_ + '\n\nTask: Suggest one short, professional call-disposition remark (1-2 sentences, Hinglish) based on the case snapshot below. Reply with the remark only, no preamble.';
+    const prompt = '[CASE]\n' + JSON.stringify({ client: lead.CLIENT_NAME, loan: lead.LOAN_TYPE, bank: lead.PREFERRED_BANK, status: lead.CASE_CATEGORY, remarks: lead.REMARKS }, null, 2);
+    const remark = MULTI_BRAIN_REPLY_(prompt, sys);
+    return { ok: true, remark: String(remark || '').slice(0, 300) };
+  } catch (e) { LOG_ERR_('P1_CALLING_AI_REMARK', payload.empCode, e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── calling.html: disposition save (submitDisposition / closeNotesModal flow) ── */
+function P1_CALLING_UPDATE(payload) {
+  payload = payload || {};
+  try {
+    const agent = String(payload.agent || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(agent, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const query = payload.leadId || payload.mobile;
+    const res = UPDATE_LEAD_STATUS_(query, payload.status, payload.remarks);
+    if (res.ok) {
+      try { RECORD_TASK_FOR_ATTENDANCE_(agent); } catch (_) {}
+      const sh = GET_OR_CREATE_('CALL_LOG');
+      P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'MOBILE', 'STATUS', 'REMARKS', 'DURATION_SEC']);
+      sh.appendRow([new Date(), agent, payload.leadId || '', payload.mobile || '', payload.status || '', String(payload.remarks || '').slice(0, 300), Number(payload.durationSec || 0)]);
+    }
+    return res;
+  } catch (e) { LOG_ERR_('P1_CALLING_UPDATE', payload.agent, e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── calling.html: initiateCall() fire-and-forget call-start log ── */
+function P1_CALLING_START(payload) {
+  payload = payload || {};
+  try {
+    const code = String(payload.empCode || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const sh = GET_OR_CREATE_('CALL_LOG');
+    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'MOBILE', 'STATUS', 'REMARKS', 'DURATION_SEC']);
+    sh.appendRow([new Date(), code, String(payload.leadId || '').trim(), '', 'STARTED', '', 0]);
+    return { ok: true };
+  } catch (e) { LOG_ERR_('P1_CALLING_START', '', e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── calling.html: p1SaveCaseFiles() ── */
+function P1_MINI_CRM_UPLOAD(payload) {
+  payload = payload || {};
+  try {
+    const code = String(payload.empCode || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const leadId = String(payload.leadId || '').trim();
+    const files = Array.isArray(payload.files) ? payload.files : [];
+    if (!leadId) return { ok: false, err: 'leadId required' };
+    if (!files.length) return { ok: true, skipped: true };
+
+    const parentId = PropertiesService.getScriptProperties().getProperty('CLIENT_DOCS_FOLDER_ID');
+    if (!parentId) return { ok: false, err: 'CLIENT_DOCS_FOLDER_ID not configured' };
+    const parent = DriveApp.getFolderById(parentId);
+    const existing = parent.getFoldersByName(leadId);
+    const folder = existing.hasNext() ? existing.next() : parent.createFolder(leadId);
+
+    const links = [];
+    files.forEach(f => {
+      if (!f || !f.base64) return;
+      const bytes = Utilities.base64Decode(String(f.base64).split(',').pop());
+      const blob = Utilities.newBlob(bytes, f.mimeType || 'application/octet-stream', f.name || ('file_' + Date.now()));
+      links.push(folder.createFile(blob).getUrl());
+    });
+
+    const sh = GET_OR_CREATE_('CASE_FILES_LOG');
+    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'REMARKS', 'FILE_LINKS']);
+    sh.appendRow([new Date(), code, leadId, String(payload.remarks || ''), links.join(', ')]);
+
+    try {
+      const master = SHEET_('MASTER_DATA');
+      if (master && master.getLastRow() >= 2) {
+        const h = master.getRange(1, 1, 1, master.getLastColumn()).getValues()[0].map(DC_NORM_);
+        const li = h.indexOf('LEAD_ID'), di = h.indexOf('DOCS_LINK');
+        if (li > -1 && di > -1) {
+          const ids = master.getRange(2, li + 1, master.getLastRow() - 1, 1).getValues();
+          for (let i = 0; i < ids.length; i++) {
+            if (String(ids[i][0] || '').trim().toUpperCase() === leadId.toUpperCase()) {
+              master.getRange(i + 2, di + 1).setValue(folder.getUrl());
+              break;
+            }
+          }
+        }
+      }
+    } catch (linkErr) { LOG_ERR_('P1_MINI_CRM_UPLOAD_LINK', leadId, linkErr.message); }
+
+    return { ok: true, folderUrl: folder.getUrl(), files: links };
+  } catch (e) { LOG_ERR_('P1_MINI_CRM_UPLOAD', '', e.message); return { ok: false, err: e.message }; }
+}
+
+/* ── voice.html: FreePBX bridge request ── */
+function P1_PROCESS_VOICE_COMMAND(payload) {
+  payload = payload || {};
+  try {
+    const code = String(payload.empCode || '').trim().toUpperCase();
+    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
+    const mobile = DC_CLEAN_MOBILE_(payload.mobile || '');
+    if (!mobile) return { ok: false, err: 'Valid 10-digit mobile required' };
+    DC_SEND_TG_('📞 [VOICE CALL] ' + code + ' → +91' + mobile + (payload.leadId ? ' | Lead: ' + payload.leadId : ''));
+    return { ok: true, message: 'Call initiated via FreePBX bridge' };
+  } catch (e) { LOG_ERR_('P1_PROCESS_VOICE_COMMAND', payload.empCode, e.message); return { ok: false, err: e.message }; }
+}
