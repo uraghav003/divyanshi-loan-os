@@ -986,13 +986,11 @@ async function submitForm() {
         UPLOAD_TOKEN='';
         UPLOAD_TOKEN_ISSUED_AT=0;
       } else {
-        requestUploadToken();
         setStatus('❌ Submit failed: ' + safe((res && (res.err || res.errorMessage)) || 'Unknown error'), 'error');
       }
     })
     .withFailureHandler(function(err) {
       settled = true; clearTimeout(guard); btn.disabled = false;
-      requestUploadToken();
       setStatus('❌ GAS connection failed: ' + safe(err && err.message ? err.message : String(err)), 'error');
     })
     .P1_SMART_FORM_SUBMIT(payload);
