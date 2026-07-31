@@ -1,9 +1,9 @@
 // @ts-nocheck
 /******************************************************************
  * DIVYANSHI CAPITAL PVT LTD
- * Code.gs — BULBHUL V2 PRODUCTION MASTER
+ * Code.gs — DIVYANSHI ASSISTANT PRODUCTION MASTER
  * VERSION : V9.3.0-FAST
- * ARCHITECT: Mallik System (DC002) / BULBHUL AI
+ * OWNER: Divyanshi Capital (DC002) / Divyanshi Assistant
  *
  * PERFORMANCE LAYER:
  *  ① In-memory cache  — DC_EMP_CACHE_, HEADER_CACHE_, ROUTING_CACHE_
@@ -19,7 +19,7 @@
  *  → ACCOUNTS_LOG on DISBURSE → Attendance counter
  *
  * AI : DeepSeek → OpenAI → Gemini → fallback
- * MALLIK_API_KEY ,Master SS: 1Mk9AzGdKK07WZCKV6lZgtlM4JWy2sdESQwh70r0UicU
+ * Secrets are stored only in Apps Script Properties.
  ******************************************************************/
 
 /* ================================================================
@@ -47,34 +47,43 @@ function CACHED_GET_(key, ttlSeconds, fn) {
   return val;
 }
 
+function THROTTLE_ONCE_(key, ttlSeconds) {
+  key = String(key || '').trim();
+  if (!key) return false;
+  if (SC_.get(key)) return true;
+  try { SC_.put(key, '1', Math.max(1, Number(ttlSeconds) || 1)); } catch (_) {}
+  return false;
+}
+
 // ── Invalidate all caches ──
 function INVALIDATE_ALL_CACHES_() {
   DC_EMP_CACHE_ = null; ROUTING_CACHE_ = null;
   PRODUCTS_CACHE_ = null; BANKS_CACHE_ = null;
+  LOAN_BANK_CATALOG_CACHE_ = null;
   Object.keys(HEADER_CACHE_).forEach(k => delete HEADER_CACHE_[k]);
-  const keys = ['EMP_MAP_V3','SRC_ROUTING_V1','LOAN_PRODUCTS_V1','BANK_OPTIONS_V1','MASTER_SNAP_V1'];
+  const keys = ['EMP_MAP_V3','SRC_ROUTING_V1','LOAN_PRODUCTS_V1','BANK_OPTIONS_V1','MASTER_SNAP_V1','MASTER_CONTROL_V1'];
   SC_.removeAll(keys);
 }
 
 const P1_TAB_MAP = {
   MASTER_DATA:    () => ['TIMESTAMP','EMP_CODE','SALES_NAME','EMPLOYEE_EMAIL',
-    'CLIENT_MOBILE','CLIENT_NAME','COMPANY_NAME','CITY_LOCATION','LOAN_TYPE',
+    'CLIENT_MOBILE','CLIENT_NAME','COMPANY_NAME','CITY_LOCATION','LOAN_TYPE','CAMPAIGN',
     'CASE_CATEGORY','CIBIL_SCORE','REMARKS','FOLLOWUP_STATUS','PREFERRED_BANK',
-    'REQUIRED_LOAN_AMOUNT','DOCS_LINK','SUBMIT_FOLDER_LINK','SOURCE_TYPE',
+    'REQUIRED_LOAN_AMOUNT','DOCS_LINK','SUBMIT_FOLDER_LINK','DATA_CONSENT','CONSENT_VERSION','CONSENT_AT','CONSENT_SOURCE','PRIVACY_NOTICE_URL','AI_NOTICE_ACCEPTED','MARKETING_CONSENT','SOURCE_TYPE',
     'SOURCE_NAME','DATA_FLOW','INTAKE_STAGE','ROUTE_STAGE','PROCESS_STAGE',
     'LOGIN_STAGE','LEAD_ID','TAT_DAYS','TAT_DEADLINE','TAT_STATUS',
-    'ELIGIBILITY_STATUS','ELIGIBLE_AMOUNT','MANAGER_EMAIL',
+    'ELIGIBILITY_STATUS','ELIGIBLE_AMOUNT','DOC_STATUS','DOC_AUDIT','FOLLOWUP_DATE','MANAGER_EMAIL',
     'ASSIGNED_COORDINATOR','DISBURSAL_NOTIFIED','LAST_UPDATED'],
   COMMON_ENTRY:   () => ['TIMESTAMP','CLIENT_NAME','CLIENT_MOBILE','CLIENT_EMAIL',
     'CITY_LOCATION','PAN_NO','EMPLOYMENT_TYPE','COMPANY_NAME','MONTHLY_INCOME',
     'EXISTING_EMI','AGE','CIBIL_SCORE','LOAN_TYPE','PREFERRED_BANK',
-    'REQUIRED_LOAN_AMOUNT','DOCS_LINK','TASK_CATEGORY','CASE_CATEGORY',
+    'REQUIRED_LOAN_AMOUNT','DOCS_LINK','DOC_STATUS','DOC_AUDIT','DATA_CONSENT','CONSENT_VERSION','CONSENT_AT','CONSENT_SOURCE','PRIVACY_NOTICE_URL','AI_NOTICE_ACCEPTED','MARKETING_CONSENT','CAMPAIGN','FOLLOWUP_DATE','TASK_CATEGORY','CASE_CATEGORY',
     'REMARKS','EMP_CODE','SALES_NAME','MANAGER_EMAIL','SOURCE_TYPE',
     'SOURCE_NAME','DATA_FLOW','LEAD_ID','INTAKE_STAGE','ROUTE_STAGE',
     'PROCESS_STAGE','LOGIN_STAGE'],
-  ALL_EMPLOYEES:  () => ['BRAND_NAME','BRANCH','EMP_CODE','EMPLOYEES_NAME','ROLE',
+  ALL_EMPLOYEES:  () => ['BRAND_NAME','BRANCH','EMP_CODE','EMPLOYEES_NAME','ROLE','DESIGNATION',
     'DEPARTMENT','LOAN_TYPE','BANK','TARGET','EMPLOYEE_EMAIL_ID','ALT_EMAIL',
-    'MOBILE','PASSWORD','HR_APPROVAL','MD_APPROVAL','MANAGER_NAME',
+    'MOBILE','PASSWORD','SALARY_MONTHLY','HR_APPROVAL','MD_APPROVAL','MANAGER_NAME',
     'MANAGER_EMAIL_ID','REGION','REPORTING_HEAD','ESCALATION_L1',
     'APPROVAL_STATUS','REMARKS','PERSONAL_FILE_ID','ACCESS_LEVEL',
     'JOINING_DATE','ACTIVE_STATUS','CREATED_AT','UPDATED_AT','SYSTEM_KEY',
@@ -94,16 +103,27 @@ const P1_TAB_MAP = {
   ACCOUNTS_LOG:   () => ['TIMESTAMP','LEAD_ID','CLIENT_NAME','CLIENT_MOBILE',
     'LOAN_TYPE','REQUIRED_LOAN_AMOUNT','PREFERRED_BANK','SALES_NAME',
     'EMP_CODE','DISBURSAL_STATUS','REMARKS'],
-  HR_MD_APPROVAL: () => ['TIMESTAMP','EMPLOYEES_NAME','EMPLOYEE_EMAIL_ID',
-    'MOBILE','DEPARTMENT','ROLE','EMP_CODE','MANAGER_NAME','MANAGER_EMAIL_ID',
-    'STATUS','ONBOARD_DONE','REMARKS'],
+  HR_MD_APPROVAL: () => ['TIMESTAMP','CANDIDATE_ID','ENTRY_TYPE','EMPLOYEES_NAME',
+    'EMPLOYEE_EMAIL_ID','MOBILE','CITY','DEPARTMENT','ROLE','EXPERIENCE_YEARS',
+    'DESIGNATION',
+    'CURRENT_COMPANY','CURRENT_CTC','EXPECTED_CTC','NOTICE_PERIOD','SKILLS',
+    'EDUCATION','INTERVIEWER_EMAIL','INTERVIEW_STATUS','RESUME_LINK',
+    'MANAGER_NAME','MANAGER_EMAIL_ID','SALARY_MONTHLY','JOINING_DATE','EMP_CODE',
+    'STATUS','ACTIVE_STATUS','TC_ACCEPTED','PRIVACY_CONSENT','CONSENT_VERSION','CONSENT_AT','PRIVACY_NOTICE_URL','ONBOARD_DONE','JOINING_KIT_SENT_AT','REMARKS'],
+  INTERVIEW_LOG:  () => ['TIMESTAMP','CANDIDATE_ID','CANDIDATE_NAME','EMAIL',
+    'MOBILE','CITY','ROLE_APPLIED','EXPERIENCE_YEARS','CURRENT_COMPANY',
+    'CURRENT_CTC','EXPECTED_CTC','NOTICE_PERIOD','SKILLS','EDUCATION',
+    'DESIGNATION','INTERVIEWER_EMAIL','INTERVIEW_STATUS','RESUME_LINK','PRIVACY_CONSENT','CONSENT_VERSION','CONSENT_AT','PRIVACY_NOTICE_URL','REMARKS'],
   Loan_Bank_Map:  () => ['LOAN_TYPE','BANK','STATUS','ROI_START','MIN_CIBIL',
     'MIN_INCOME','MAX_LOAN_AMOUNT','DOCUMENTS_REQUIRED','POLICY_REMARKS','TAT_DAYS'],
   RAW_INBOX:      () => ['RECEIVED_AT','GMAIL_MSG_ID','FROM_EMAIL','SUBJECT',
     'LEAD_ID','CLIENT_NAME','CLIENT_MOBILE','PREFERRED_BANK','LOAN_TYPE',
     'REQUIRED_LOAN_AMOUNT','CASE_STATUS','REMARKS','SOURCE_NAME','EMP_CODE',
     'PROCESS_STATUS','DEDUP_ACTION','PROCESSED_AT'],
-  ERR:            () => ['TIMESTAMP','FUNCTION','CODE','MESSAGE']
+  ERR:            () => ['TIMESTAMP','FUNCTION','CODE','MESSAGE'],
+  SYSTEM_CONTROL: () => ['LAST_UPDATED','EMP_CODE','EMPLOYEE_NAME','ROLE','DEPARTMENT','AVATAR_STATUS','TARGET','ASSIGNED_CASES','OPEN_CASES','COMPLETED_CASES','TAT_BREACHES','TODAY_ACTIVITY','LAST_ACTIVITY','ERRORS_24H','PERFORMANCE_PCT','NEXT_ACTION'],
+  SYSTEM_PROCESS_CONTROL: () => ['LAST_UPDATED','PROCESS','OWNER_ROLE','STATUS','PENDING','LAST_RUN','ISSUE','NEXT_ACTION'],
+  AVATAR_ACTIVITY_LOG: () => ['TIMESTAMP','EMP_CODE','ROLE','ACTIVITY_TYPE','SUMMARY','OUTCOME','SCORE']
 };
 
 const DC_CFG = {
@@ -114,7 +134,6 @@ const DC_CFG = {
   get META_WA_TOKEN()    { return String(PropertiesService.getScriptProperties().getProperty('META_WA_TOKEN')||'').trim(); },
   get META_WA_PHONE_ID() { return String(PropertiesService.getScriptProperties().getProperty('META_WA_PHONE_ID')||'').trim(); },
   get API_KEY()          { return String(PropertiesService.getScriptProperties().getProperty('MALLIK_API_KEY')||'').trim(); },
-
   COMPANY: {
     NAME:           'Divyanshi Capital Pvt Ltd',
     MD_EMAIL:       'upendra.raghav@divyanshicapital.com',
@@ -124,6 +143,23 @@ const DC_CFG = {
     SUPPORT_EMAIL:  'support@divyanshicapital.com'
   }
 };
+
+// Apps Script email quotas are account-dependent and can stop execution without
+// warning. Gate every non-essential outbound email and leave an auditable error.
+function P1_MAIL_QUOTA_(recipientCount, context) {
+  try {
+    const needed = Math.max(1, Number(recipientCount || 1));
+    const remaining = Number(MailApp.getRemainingDailyQuota());
+    if (remaining < needed) {
+      LOG_ERR_('MAIL_QUOTA', String(context || 'EMAIL'), `Remaining ${remaining}; required ${needed}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    LOG_ERR_('MAIL_QUOTA', String(context || 'EMAIL'), e.message);
+    return false;
+  }
+}
 
 /* ================================================================
    SECTION 02 — NORMALIZERS + HELPERS
@@ -140,7 +176,7 @@ const HEADER_ALIAS_ = {
   'AMOUNT':'REQUIRED_LOAN_AMOUNT','LOAN_AMOUNT':'REQUIRED_LOAN_AMOUNT',
   'COMMENT':'REMARKS','REMARK':'REMARKS','STATUS':'CASE_CATEGORY',
   'CASE_STATUS':'CASE_CATEGORY','CIBIL':'CIBIL_SCORE','CREDIT_SCORE':'CIBIL_SCORE',
-  'CITY':'CITY_LOCATION','COMPANY':'COMPANY_NAME','DESIGNATION':'ROLE',
+  'CITY':'CITY_LOCATION','COMPANY':'COMPANY_NAME',
   'DEPT':'DEPARTMENT','WHATSAPP_NO':'WHATSAPP_VERIFIED','WHATSAPP':'WHATSAPP_VERIFIED'
 };
 
@@ -172,7 +208,7 @@ function DC_GET_SS_() {
       return SS_INSTANCE_;
     } catch(_){}
   }
-  try { const a = SpreadsheetApp.getActiveSpreadsheet(); if (a) { SS_INSTANCE_=a; return a; } } catch(_){}
+  try { const a = SpreadsheetApp.getActiveSpreadsheet(); if(a){ SS_INSTANCE_=a; return a; } } catch(_){}
   const id = PropertiesService.getScriptProperties().getProperty('MASTER_FILE_ID')||'';
   if (id) { SS_INSTANCE_ = SpreadsheetApp.openById(id); return SS_INSTANCE_; }
   throw new Error('Cannot open Master Sheet. Set MASTER_SS_ID in Code.gs');
@@ -192,6 +228,7 @@ function GET_OR_CREATE_(name) {
   return newSh;
 }
 
+function P1_GET_OR_CREATE_SHEET_(name) { return GET_OR_CREATE_(name); }
 
 function P1_OPEN_SS_SAFE_(fileId) {
   for (let i = 1; i <= 2; i++) {   // reduced to 2 retries (was 3)
@@ -202,13 +239,36 @@ function P1_OPEN_SS_SAFE_(fileId) {
 
 function P1_GET_EXEC_URL_() {
   const p = PropertiesService.getScriptProperties();
-  let url = p.getProperty('P1_EXEC_URL') || p.getProperty('MAIN_SERVER_EXEC_URL') || '';
+  let url = p.getProperty('P1_EXEC_URL') || '';
   if (!url) { try { url = ScriptApp.getService().getUrl(); } catch(_){} }
-  // Never hand out a /dev URL — only the script owner/editors can open it,
-  // so every generated employee link (website, form, card, calling, voice)
-  // would silently fail for regular staff. Always normalize to /exec.
-  url = String(url || '').replace(/\/dev(\?|$)/, '/exec$1');
   return url || '';
+}
+
+// Supports the existing GAS filename and the local project filename without duplicating a page.
+function P1_HTML_FROM_FILES_(fileNames) {
+  let lastError = null;
+  for (const fileName of fileNames) {
+    try { return HtmlService.createHtmlOutputFromFile(fileName); }
+    catch (err) { lastError = err; }
+  }
+  throw lastError || new Error('HTML file not found');
+}
+
+// Canonical property migration. Legacy aliases are read once, then removed.
+function P1_MIGRATE_CORE_PROPERTIES_() {
+  const props = PropertiesService.getScriptProperties();
+  const legacyExecUrl = String(props.getProperty('MAIN_SERVER_EXEC_URL') || '').trim();
+  const legacyMasterId = String(props.getProperty('P1_MASTER_FILE_ID') || '').trim();
+
+  if (!props.getProperty('P1_EXEC_URL') && legacyExecUrl) {
+    props.setProperty('P1_EXEC_URL', legacyExecUrl);
+  }
+  if (!props.getProperty('MASTER_FILE_ID') && legacyMasterId) {
+    props.setProperty('MASTER_FILE_ID', legacyMasterId);
+  }
+
+  props.deleteProperty('MAIN_SERVER_EXEC_URL');
+  props.deleteProperty('P1_MASTER_FILE_ID');
 }
 
 /* ================================================================
@@ -330,6 +390,7 @@ function DC_BUILD_EMP_MAP_(forceRefresh) {
     obj.MANAGER_EMAIL_ID = obj.MANAGER_EMAIL;
     obj.REPORTING_HEAD   = String(obj['REPORTING_HEAD']||'').trim();
     obj.ROLE             = String(obj['ROLE']||'').trim();
+    obj.DESIGNATION      = String(obj['DESIGNATION']||obj['JOB_TITLE']||obj['ROLE']||'').trim();
     obj.DEPARTMENT       = String(obj['DEPARTMENT']||'').trim().toUpperCase();
     obj.LOAN_TYPE        = String(obj['LOAN_TYPE']||'').trim().toUpperCase();
     obj.BANK = String(obj['PREFERRED_BANK']||obj['BANK']||'').trim().toUpperCase();
@@ -408,7 +469,24 @@ function DEFAULT_ROUTING_MAP_() {
     'DSA':'LOGIN DEPARTMENT','SEND TO LOGIN':'LOGIN DEPARTMENT',
     'COMPLETED':'LOGIN DEPARTMENT','LOGIN DONE':'LOGIN DEPARTMENT',
     'MIS-INCOMING':'REPORT','MIS UPDATE':'REPORT',
-    'ONBOARD':'HR','INTERVIEW':'HR'
+    'ONBOARD':'HR','INTERVIEW':'HR','NEW STAFF ENTRY':'HR','INTERVIEW ENTRY':'HR',
+    'BANKER ENTRY':'LOGIN DEPARTMENT'
+  };
+}
+
+function P1_GET_HR_PUBLIC_CONFIG() {
+  const props = PropertiesService.getScriptProperties();
+  const privacyUrl=String(props.getProperty('PRIVACY_NOTICE_URL')||'').trim();
+  return {
+    tcUrl: String(props.getProperty('HR_TC_URL')||'').trim(),
+    companyUrl: props.getProperty('COMPANY_WEBSITE_URL') || 'https://www.divyanshicapital.com',
+    privacyUrl,
+    privacyConfigured: /^https:\/\//i.test(privacyUrl),
+    consentVersion: String(props.getProperty('CONSENT_VERSION')||'').trim(),
+    privacyContact: DC_CLEAN_EMAIL_(props.getProperty('PRIVACY_CONTACT_EMAIL')||DC_CFG.COMPANY.SUPPORT_EMAIL),
+    grievanceOfficer: String(props.getProperty('GRIEVANCE_OFFICER_NAME')||'').trim(),
+    clientRetentionDays: Number(props.getProperty('CLIENT_RETENTION_DAYS')||0),
+    candidateRetentionDays: Number(props.getProperty('CANDIDATE_RETENTION_DAYS')||0)
   };
 }
 
@@ -428,12 +506,14 @@ function BUILD_AI_CONTEXT_(empCode) {
         ctx += `Name:${emp.NAME} | Code:${emp.EMP_CODE} | Role:${emp.ROLE}\n`;
         ctx += `Dept:${emp.DEPARTMENT} | Mgr:${emp.MANAGER_EMAIL}\n\n`;
       }
-      const codes = Object.keys(map).slice(0,20);
+      const fullAccess=P1_HAS_MASTER_ACCESS_(emp),scope=emp?String(emp.DASHBOARD_ACCESS||emp.ACCESS_LEVEL||'SELF').toUpperCase():'SELF',isManager=emp&&/MANAGER|HEAD/.test(String(emp.ROLE||'').toUpperCase());
+      const codes = Object.keys(map).filter(code=>fullAccess||((scope==='TEAM'||isManager)&&P1_CAN_SEE_EMP_(emp,map[code]))).slice(0,20);
       if (codes.length) {
         ctx += '[TEAM]\n';
         codes.forEach(c=>{ const e=map[c]; ctx+=`${e.EMP_CODE}:${e.NAME}(${e.ROLE||'RM'}) Mgr:${e.MANAGER_EMAIL}\n`; });
         ctx += '\n';
       }
+      if(emp)ctx+='[SYSTEM CONTROL]\n'+P1_FORMAT_MASTER_CONTROL_(emp.EMP_CODE)+'\n\n';
       const products = GET_ACTIVE_LOAN_PRODUCTS_();
       if (products.length) {
         ctx += '[PRODUCTS]\n';
@@ -453,7 +533,13 @@ function BUILD_AI_CONTEXT_(empCode) {
    SECTION 09 — AI BRAIN (DeepSeek → OpenAI → Gemini → fallback)
    ================================================================ */
 
-function MULTI_BRAIN_REPLY_(prompt, systemContent) {
+function MULTI_BRAIN_REPLY_(prompt, systemContent, maxOutputTokens) {
+  // Keep AI requests deliberately small: this assistant is advisory-only and
+  // its UI already asks for short answers.  Callers can opt into a larger
+  // budget only where a structured credit note genuinely needs it.
+  const outputLimit=Math.max(80,Math.min(550,Number(maxOutputTokens)||350));
+  prompt=String(prompt||'').slice(0,1800);
+  systemContent=String(systemContent||'').slice(0,1800);
   const opts = (key, url, body) => ({
     method:'post', muteHttpExceptions:true,
     headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
@@ -464,104 +550,65 @@ function MULTI_BRAIN_REPLY_(prompt, systemContent) {
 
   if (dKey) {
     try {
-      const res = UrlFetchApp.fetch('https://api.deepseek.com/v1/chat/completions', opts(dKey,'',{model:'deepseek-chat',messages:msgs,temperature:0.3,max_tokens:900}));
+      const res = UrlFetchApp.fetch('https://api.deepseek.com/v1/chat/completions', opts(dKey,'',{model:'deepseek-chat',messages:msgs,temperature:0.3,max_tokens:outputLimit}));
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.choices?.[0]?.message?.content) return String(j.choices[0].message.content).trim(); }
     } catch(e){ LOG_ERR_('AI_DS','',e.message); }
   }
   if (oKey) {
     try {
-      const res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', opts(oKey,'',{model:'gpt-4o-mini',messages:msgs,temperature:0.3,max_tokens:900}));
+      const res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', opts(oKey,'',{model:'gpt-4o-mini',messages:msgs,temperature:0.3,max_tokens:outputLimit}));
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.choices?.[0]?.message?.content) return String(j.choices[0].message.content).trim(); }
     } catch(e){ LOG_ERR_('AI_OAI','',e.message); }
   }
   if (gKey) {
     try {
-      const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+gKey, {method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({contents:[{role:'user',parts:[{text:'System:\n'+systemContent+'\n\nUser:\n'+prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:900}})});
+      const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+gKey, {method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({contents:[{role:'user',parts:[{text:'System:\n'+systemContent+'\n\nUser:\n'+prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:outputLimit}})});
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.candidates?.[0]?.content?.parts?.[0]?.text) return String(j.candidates[0].content.parts[0].text).trim(); }
     } catch(e){ LOG_ERR_('AI_GEM','',e.message); }
   }
-  return 'Namaste! Bulbhul active hai. Loan, bank options, case status ke liye message karein.';
+  return 'Namaste! Divyanshi Assistant active hai. Loan, bank options, case status ke liye message karein.';
 }
 
 /* ================================================================
-   SECTION 10 — BULBHUL AVATAR BRAIN + AUTO-COMMANDS
+   SECTION 10 — BULBHUL AVATAR BRAIN
    ================================================================ */
 
 const BULBHUL_ROLE_PROMPTS_ = {
-  'MD'           :'You are BULBHUL for MD Upendra Singh Raghav (DC002). Full portfolio. Strategic data-first.',
-  'FOUNDER'      :'You are BULBHUL for Founder Narendra (DC001). P&L, key accounts, system health.',
-  'SALES MEMBER' :'You are BULBHUL for Sales RM. Lead conversion: bank fitment, CIBIL tips, doc checklist.',
-  'SALES MANAGER':'You are BULBHUL for Sales Manager. Team pipeline, follow-ups, disbursal targets.',
-  'COORDINATOR'  :'You are BULBHUL for Login Coordinator. Bank login, TAT gaps, doc status.',
-  'ACCOUNTS'     :'You are BULBHUL for Accounts (Sachin DC037). Disbursals, PF/PDD, payments.',
-  'HR'           :'You are BULBHUL for HR Head Khushboo (DC013). Hiring, attendance, onboarding.'
+  'MD'           :'You are Divyanshi Assistant for MD Upendra Singh Raghav (DC002). Full portfolio. Strategic data-first.',
+  'FOUNDER'      :'You are Divyanshi Assistant for Founder Narendra (DC001). P&L, key accounts, system health.',
+  'SALES MEMBER' :'You are Divyanshi Assistant for Sales RM. Lead conversion: bank fitment, CIBIL tips, doc checklist.',
+  'SALES MANAGER':'You are Divyanshi Assistant for Sales Manager. Team pipeline, follow-ups, disbursal targets.',
+  'COORDINATOR'  :'You are Divyanshi Assistant for Login Coordinator. Bank login, TAT gaps, doc status.',
+  'ACCOUNTS'     :'You are Divyanshi Assistant for Accounts (Sachin DC037). Disbursals, PF/PDD, payments.',
+  'HR'           :'You are Divyanshi Assistant for HR Head Khushboo (DC013). Hiring, attendance, onboarding.'
 };
 
-/* Employee-card personas: the bot reflects the employee's real role/department,
-   but stays advisory and never exposes internal records or makes decisions. */
-function P1_EMPLOYEE_PERSONA_(emp) {
-  const role=String((emp&&emp.ROLE)||'').toUpperCase();
-  const dept=String((emp&&emp.DEPARTMENT)||'').toUpperCase();
-  const label=String((emp&&emp.NAME)||'Divyanshi Capital');
-  if(role.includes('HR')||dept.includes('HR')||dept.includes('HUMAN RESOURCE')) return {
-    title:label+'\'s Hiring Assistant',
-    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke HR desk se. Jobs, hiring process, interview preparation aur application steps ke baare mein poochiye.',
-    instruction:'You support prospective candidates for HR and hiring. Explain available hiring/application steps only from approved knowledge, suggest a formal application or HR follow-up, and never promise selection, salary, an interview, or a joining date. Never disclose employee or candidate information.'
-  };
-  if(role.includes('ACCOUNT')||dept.includes('ACCOUNT')||dept.includes('FINANCE')) return {
-    title:label+'\'s Accounts Assistant',
-    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke Accounts desk se. Disbursement process, receipts aur general payment guidance ke baare mein poochiye.',
-    instruction:'You support general accounts and disbursement-process questions. Do not confirm payments, balances, settlements, or account details. Never request banking credentials, OTPs, PINs, card details, or payment screenshots.'
-  };
-  if(role.includes('LOGIN')||role.includes('OPERATION')||dept.includes('LOGIN')||dept.includes('OPERATION')) return {
-    title:label+'\'s Processing Assistant',
-    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke loan-processing desk se. Documents, bank-login process aur next steps ke baare mein poochiye.',
-    instruction:'You support general loan-processing, documents, and bank-login preparation questions. Do not reveal or infer an application status, bank decision, case data, or TAT promise. Direct case-specific requests to the assigned team member.'
-  };
-  if(role.includes('MD')||role.includes('FOUNDER')||role.includes('DIRECTOR')||dept.includes('MANAGEMENT')) return {
-    title:label+'\'s Executive Assistant',
-    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke digital executive assistant ke roop mein. Divyanshi Capital, partnerships aur our lending vision ke baare mein poochiye.',
-    instruction:'You support public company, partnership, and leadership questions. Keep answers factual and professional. Do not disclose internal strategy, employee data, financials, or confidential operational information.'
-  };
-  return {
-    title:label+'\'s Loan Assistant',
-    greeting:'Namaste! Main Bulbhul hoon, '+label+' ke saath Divyanshi Capital se. Loan options, documents aur application ke next step ke baare mein poochiye.',
-    instruction:'You support prospective borrowers. Explain general loan options, documents, eligibility preparation, and the application process. Never guarantee approval, invent rates, or make a credit decision. For a personal assessment, direct visitors to the employee application link.'
-  };
-}
-
 const BULBHUL_SYS_BASE_ =
-  '# BULBHUL V2 | Divyanshi Capital Pvt Ltd\n' +
+  '# Divyanshi Assistant | Divyanshi Capital Pvt Ltd\n' +
   'Products: PL(3d) BL(7d) HL(15d) LAP(15d) AUTO(5d)\n' +
-  'Governance: MD+HR approve money/hiring/salary. BULBHUL proposes only.\n\n' +
-  'AUTO-COMMANDS (embed when action needed):\n' +
-  '[[UPDATE_LEAD: id, status, remark]]\n' +
-  '[[LOOKUP_LEAD: id_or_mobile]]\n' +
-  '[[ADD_REMARK: id, remark]]\n' +
-  '[[FOLLOWUP_PUSH: mobile, msg]]\n' +
-  '[[MANAGER_CHECKIN: emp_code, 1_or_2]]\n\n' +
+  'Governance: MD+HR approve money/hiring/salary. Divyanshi Assistant advises only and never executes a status, message, attendance or approval change from chat.\n\n' +
   'Reply short, direct, Hinglish.';
 
 function BULBHUL_CHAT_API_(data) {
   data = data||{};
-  const rawMsg = String(data.message||'').trim().slice(0,1000);
-  const empCode=String(data.empCode||'').trim().toUpperCase();
-  if(!empCode || !P1_VALIDATE_ACCESS_(empCode,data.accessToken)) return 'Your staff session has expired. Please sign in again.';
-  const emp    = FIND_EMPLOYEE_FULL_(empCode);
-  if(!emp) return 'Your staff account is unavailable.';
-  if(data.leadId && !P1_CASE_FOR_EMPLOYEE_(empCode,data.leadId)) return 'That case is not assigned to your account.';
+  const rawMsg = String(data.message||'').trim().slice(0,500);
+  const emp    = data.empCode ? FIND_EMPLOYEE_FULL_(data.empCode) : null;
+  const empCode = String(data.empCode || '').trim().toUpperCase();
+  if (empCode && THROTTLE_ONCE_('AI_CHAT_THROTTLE_' + empCode, 8)) return 'Ek moment, previous message process ho raha hai. Thoda wait karein.';
   const role   = emp ? String(emp.ROLE||'').toUpperCase() : '';
+  if(emp&&/(^|\s)\/?(system|health|avatars?|bugs?|performance)(\s|$)/i.test(rawMsg)){
+    const direct=P1_FORMAT_MASTER_CONTROL_(emp.EMP_CODE);P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'SYSTEM_CONTROL',rawMsg,'ANSWERED',100);return direct;
+  }
   let rolePrompt = BULBHUL_ROLE_PROMPTS_['SALES MEMBER'];
   for (const k of Object.keys(BULBHUL_ROLE_PROMPTS_)) { if(role.includes(k)){rolePrompt=BULBHUL_ROLE_PROMPTS_[k];break;} }
-  if(emp) rolePrompt += '\n\nEmployee persona: '+P1_EMPLOYEE_PERSONA_(emp).instruction;
-  const sysPrompt = BULBHUL_SYS_BASE_ + '\n\n[LIVE CONTEXT]\n' + BUILD_AI_CONTEXT_(data.empCode) + '\n\n' + rolePrompt;
+  const sysPrompt = BULBHUL_SYS_BASE_ + '\n\n[LIVE CONTEXT]\n' + BUILD_AI_CONTEXT_(data.empCode).slice(0,1000) + '\n\n' + rolePrompt;
 
   let extraCtx = '';
   try {
     const mM = rawMsg.match(/\b[6-9]\d{9}\b/), lM = rawMsg.match(/\bL\d{4,}_\d+\b/i);
     if (mM||lM) {
       const q = lM ? lM[0].toUpperCase() : mM[0];
-      const found = GET_MASTER_SNAPSHOT_().find(c => String(c.LEAD_ID||'').toUpperCase()===q || DC_CLEAN_MOBILE_(String(c.CLIENT_MOBILE||''))===DC_CLEAN_MOBILE_(q));
+      const found = emp?GET_MASTER_SNAPSHOT_().find(c => (String(c.LEAD_ID||'').toUpperCase()===q || DC_CLEAN_MOBILE_(String(c.CLIENT_MOBILE||''))===DC_CLEAN_MOBILE_(q))&&P1_CALLING_CAN_ACCESS_(emp,c)):null;
       extraCtx = found
         ? `\n[CASE] ID:${found.LEAD_ID}|Client:${found.CLIENT_NAME}|Loan:${found.LOAN_TYPE}|Bank:${found.PREFERRED_BANK}|Status:${found.CASE_CATEGORY}|TAT:${found.TAT_STATUS}|Owner:${found.EMP_CODE}`
         : `\n[CASE] Not found: "${q}"`;
@@ -569,27 +616,13 @@ function BULBHUL_CHAT_API_(data) {
   } catch(_){}
 
   const fullPrompt = (emp?`[SENDER] ${emp.NAME}(${emp.EMP_CODE})|${emp.ROLE}\n`:'[SENDER] Visitor\n') + extraCtx + '\n\n[USER]: ' + rawMsg;
-  let reply = MULTI_BRAIN_REPLY_(fullPrompt, sysPrompt);
-  // Assistant replies are advisory only. CRM writes and outbound messages require
-  // an explicit, separately authorised workflow rather than model-generated commands.
-  return String(reply||'Assistant is unavailable. Please retry.');
-
-  // Execute embedded commands
-  let log='';
-  const R={
-    U:/\[\[UPDATE_LEAD:\s*([^,\]]+),\s*([^,\]]+),\s*([^\]]+)\]\]/i,
-    L:/\[\[LOOKUP_LEAD:\s*([^\]]+)\]\]/i,
-    R:/\[\[ADD_REMARK:\s*([^,\]]+),\s*([^\]]+)\]\]/i,
-    F:/\[\[FOLLOWUP_PUSH:\s*([^,\]]+),\s*([^\]]+)\]\]/i,
-    C:/\[\[MANAGER_CHECKIN:\s*([^,\]]+),\s*([^\]]+)\]\]/i
-  };
-  let m;
-  if((m=reply.match(R.U))){const r=UPDATE_LEAD_STATUS_(m[1].trim(),m[2].trim(),m[3].trim());log+=r.ok?`\n✅ ${m[1].trim()}→${m[2].trim()}`:`\n❌ ${r.err}`;}
-  if((m=reply.match(R.L))){const c=GET_MASTER_SNAPSHOT_().find(x=>String(x.LEAD_ID||'').toUpperCase()===m[1].trim().toUpperCase()||DC_CLEAN_MOBILE_(String(x.CLIENT_MOBILE||''))===DC_CLEAN_MOBILE_(m[1].trim()));log+=c?`\n🔍 ${c.LEAD_ID}|${c.CLIENT_NAME}|${c.CASE_CATEGORY}|TAT:${c.TAT_STATUS}`:`\n🔍 Not found`;}
-  if((m=reply.match(R.R))){UPDATE_LEAD_STATUS_(m[1].trim(),null,m[2].trim());log+=`\n📝 Remark→${m[1].trim()}`;}
-  if((m=reply.match(R.F))){DC_SEND_WA_(m[1].trim(),'📩 [Divyanshi Capital]\n'+m[2].trim());log+=`\n📨 FUP→${m[1].trim()}`;}
-  if((m=reply.match(R.C))){const r=MANAGER_SELFIE_CHECKIN_(m[1].trim().toUpperCase(),Number(m[2].trim())||1);log+=r.ok?`\n✅ Checkin:${r.status}`:`\n❌ ${r.err}`;}
-  if(log) reply=reply.replace(R.U,'🔄').replace(R.L,'🔍').replace(R.R,'📝').replace(R.F,'📨').replace(R.C,'🏢')+'\n'+log;
+  // Repeated taps / webhook retries must not spend a second AI request.
+  const cacheKey='AI_CHAT_V1_'+P1_B64URL_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(data.empCode||'')+'|'+fullPrompt,Utilities.Charset.UTF_8)).slice(0,40);
+  const cached=SC_.get(cacheKey);
+  if(cached) return cached;
+  const reply = MULTI_BRAIN_REPLY_(fullPrompt, sysPrompt, 350);
+  SC_.put(cacheKey,String(reply||'').slice(0,1600),300);
+  if(emp)P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'BULBHUL_CHAT',rawMsg,'ANSWERED',100);
   return reply;
 }
 
@@ -604,108 +637,379 @@ function GET_MASTER_SNAPSHOT_() {
   });
 }
 
+function P1_SHEET_OBJECTS_(name){
+  const sh=SHEET_(name);if(!sh||sh.getLastRow()<2)return[];
+  const data=sh.getDataRange().getValues(),h=data[0].map(DC_NORM_);
+  return data.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;});
+}
+
+function P1_HAS_MASTER_ACCESS_(emp){
+  if(!emp)return false;
+  const scope=String(emp.DASHBOARD_ACCESS||emp.ACCESS_LEVEL||'').toUpperCase(),role=String(emp.ROLE||'').toUpperCase();
+  return scope==='ALL'||/FOUNDER|MANAGING DIRECTOR|\bMD\b|ADMIN/.test(role);
+}
+function P1_ROLE_CAN_USE_CALLING_(emp){
+  if(!emp)return false;
+  if(P1_HAS_MASTER_ACCESS_(emp))return true;
+  return /SALES|CALL|RELATIONSHIP|LOGIN|COORDINATOR|MANAGER|HEAD/.test((String(emp.ROLE||'')+' '+String(emp.DEPARTMENT||'')).toUpperCase());
+}
+
+function P1_CAN_SEE_EMP_(requester,target){
+  if(!requester||!target)return false;
+  if(P1_HAS_MASTER_ACCESS_(requester))return true;
+  if(requester.EMP_CODE===target.EMP_CODE)return true;
+  const scope=String(requester.DASHBOARD_ACCESS||requester.ACCESS_LEVEL||'').toUpperCase(),role=String(requester.ROLE||'').toUpperCase();
+  return(scope==='TEAM'||/MANAGER|HEAD/.test(role))&&DC_CLEAN_EMAIL_(target.MANAGER_EMAIL)===DC_CLEAN_EMAIL_(requester.EMAIL);
+}
+
+function P1_MASTER_CONTROL_SNAPSHOT_(force){
+  if(force){SC_.remove('MASTER_SNAP_V1');SC_.remove('MASTER_CONTROL_V1');}
+  const build=()=>{
+    const now=new Date(),nowMs=now.getTime(),dayMs=86400000,tz='Asia/Kolkata',today=Utilities.formatDate(now,tz,'yyyy-MM-dd');
+    const empMap=DC_BUILD_EMP_MAP_(!!force),cases=GET_MASTER_SNAPSHOT_(),attendance=P1_SHEET_OBJECTS_('ATTENDANCE_LOG'),activity=P1_SHEET_OBJECTS_('AVATAR_ACTIVITY_LOG'),errors=P1_SHEET_OBJECTS_('ERR');
+    const completedSet={APPROVED:1,DISBURSED:1,DISBURSE:1,COMPLETED:1,CLOSED:1,REJECTED:1};
+    const todayAttendance={};attendance.forEach(a=>{try{if(Utilities.formatDate(new Date(a.DATE||a.LAST_UPDATED),tz,'yyyy-MM-dd')===today)todayAttendance[String(a.EMP_CODE||'').toUpperCase()]=String(a.ATTENDANCE_STATUS||'ACTIVE');}catch(_){}});
+    const activityByEmp={};activity.forEach(a=>{const code=String(a.EMP_CODE||'').toUpperCase();if(!code)return;const t=new Date(a.TIMESTAMP||0).getTime()||0;if(!activityByEmp[code]||t>activityByEmp[code].time)activityByEmp[code]={time:t,type:a.ACTIVITY_TYPE||'',outcome:a.OUTCOME||''};});
+    const recentErrors=errors.filter(e=>{const t=new Date(e.TIMESTAMP||0).getTime();return t&&nowMs-t<=dayMs;});
+    const avatars=Object.keys(empMap).map(code=>{
+      const emp=empMap[code],mine=cases.filter(c=>String(c.EMP_CODE||'').toUpperCase()===code),open=mine.filter(c=>!completedSet[String(c.CASE_CATEGORY||'OPEN').toUpperCase()]),completed=mine.length-open.length;
+      const breaches=open.filter(c=>{const status=String(c.TAT_STATUS||'').toUpperCase();const deadline=new Date(c.TAT_DEADLINE||0).getTime();return/BREACH|OVERDUE|DELAY/.test(status)||(deadline&&deadline<nowMs);}).length;
+      const empErrors=recentErrors.filter(e=>String(e.CODE||'').toUpperCase()===code).length,lastCase=mine.reduce((m,c)=>Math.max(m,new Date(c.LAST_UPDATED||c.TIMESTAMP||0).getTime()||0),0),lastAvatar=activityByEmp[code]||{time:0,type:'',outcome:''},lastMs=Math.max(lastCase,lastAvatar.time),target=Math.max(0,Number(emp.TARGET||0));
+      const performance=target?Math.min(100,Math.round(completed/target*100)):(mine.length?Math.round(completed/mine.length*100):0),todayWork=todayAttendance[code]||((lastMs&&Utilities.formatDate(new Date(lastMs),tz,'yyyy-MM-dd')===today)?'ACTIVE':'');
+      let status='OK',next='Continue assigned work';
+      if(empErrors){status='BUG';next='Review ERR log and repair assigned process';}
+      else if(breaches){status='ACTION_REQUIRED';next=`Clear ${breaches} TAT breach(es)`;}
+      else if(!todayWork&&!mine.length){status='IDLE';next='Manager should assign role-specific work';}
+      else if(open.length){status='ACTIVE';next=`Work ${open.length} open case(s)`;}
+      return{LAST_UPDATED:now,EMP_CODE:code,EMPLOYEE_NAME:emp.NAME||'',ROLE:emp.ROLE||'',DEPARTMENT:emp.DEPARTMENT||'',AVATAR_STATUS:status,TARGET:target||'',ASSIGNED_CASES:mine.length,OPEN_CASES:open.length,COMPLETED_CASES:completed,TAT_BREACHES:breaches,TODAY_ACTIVITY:todayWork||'NO_ACTIVITY',LAST_ACTIVITY:lastMs?new Date(lastMs):'',ERRORS_24H:empErrors,PERFORMANCE_PCT:performance,NEXT_ACTION:next};
+    });
+    const hrPending=P1_SHEET_OBJECTS_('HR_MD_APPROVAL').filter(r=>!['APPROVED','ACTIVE','COMPLETED'].includes(String(r.STATUS||r.ACTIVE_STATUS||'PENDING').toUpperCase())).length;
+    const loginPending=cases.filter(c=>/LOGIN/.test(String(c.DATA_FLOW||c.SOURCE_NAME||c.CASE_CATEGORY||'').toUpperCase())&&!completedSet[String(c.LOGIN_STAGE||c.CASE_CATEGORY||'PENDING').toUpperCase()]).length;
+    const accountsPending=P1_SHEET_OBJECTS_('ACCOUNTS_LOG').filter(r=>!['PAID','COMPLETED','CLOSED'].includes(String(r.DISBURSAL_STATUS||'PENDING').toUpperCase())).length;
+    const unassigned=cases.filter(c=>!String(c.EMP_CODE||'').trim()).length,misLastRaw=PropertiesService.getScriptProperties().getProperty('MIS_LAST_RUN')||'',misLastMs=new Date(misLastRaw||0).getTime()||0,misDelayed=!misLastMs||nowMs-misLastMs>30*60000,aiKeys=[DC_CFG.DEEPSEEK_KEY,DC_CFG.OPENAI_KEY,DC_CFG.GEMINI_KEY].filter(Boolean).length;
+    const proc=(process,owner,status,pending,lastRun,issue,next)=>({LAST_UPDATED:now,PROCESS:process,OWNER_ROLE:owner,STATUS:status,PENDING:pending,LAST_RUN:lastRun||'',ISSUE:issue||'',NEXT_ACTION:next||'Continue monitoring'});
+    const processes=[
+      proc('SALES','SALES','ACTIVE',avatars.reduce((s,x)=>s+x.OPEN_CASES,0),'','Open assigned cases','Follow up by TAT and update status'),
+      proc('LOGIN','LOGIN TEAM',loginPending?'ACTION_REQUIRED':'OK',loginPending,'',loginPending?'Cases waiting for login/proceed':'','Process login queue and bank responses'),
+      proc('HR','HR',hrPending?'ACTION_REQUIRED':'OK',hrPending,'',hrPending?'Approvals/onboarding pending':'','Complete HR/MD approval and joining formalities'),
+      proc('ACCOUNTS','ACCOUNTS',accountsPending?'ACTION_REQUIRED':'OK',accountsPending,'',accountsPending?'Disbursal follow-up pending':'','Clear PF/PDD/payment queue'),
+      proc('MIS','MIS',misDelayed?'BUG':'OK',misDelayed?1:0,misLastRaw,misDelayed?'MIS trigger missing or delayed':'','Run MIS pipeline and inspect trigger'),
+      proc('BULBHUL_AI','MD/FOUNDER',aiKeys?'OK':'BUG',aiKeys?0:1,activity.length?activity[activity.length-1].TIMESTAMP:'',aiKeys?'': 'No AI provider key configured','Configure one approved server-side AI key'),
+      proc('DATA_QUALITY','MD/MANAGERS',unassigned?'ACTION_REQUIRED':'OK',unassigned,'',unassigned?'Cases without employee ownership':'','Assign using verified manager/employee mapping'),
+      proc('ERROR_LOG','TECHNICAL',recentErrors.length?'ACTION_REQUIRED':'OK',recentErrors.length,recentErrors.length?recentErrors[recentErrors.length-1].TIMESTAMP:'',recentErrors.length?'Errors recorded in last 24 hours':'','Review ERR and fix root cause')
+    ];
+    const summary={employees:avatars.length,ok:avatars.filter(x=>x.AVATAR_STATUS==='OK'||x.AVATAR_STATUS==='ACTIVE').length,attention:avatars.filter(x=>x.AVATAR_STATUS==='ACTION_REQUIRED').length,bugs:avatars.filter(x=>x.AVATAR_STATUS==='BUG').length,idle:avatars.filter(x=>x.AVATAR_STATUS==='IDLE').length,openCases:avatars.reduce((s,x)=>s+x.OPEN_CASES,0),tatBreaches:avatars.reduce((s,x)=>s+x.TAT_BREACHES,0),errors24h:recentErrors.length,processIssues:processes.filter(x=>x.STATUS!=='OK'&&x.STATUS!=='ACTIVE').length,lastUpdated:now};
+    return{ok:true,summary,avatars,processes,bugs:recentErrors.slice(-20).reverse().map(e=>({time:e.TIMESTAMP||'',function:e.FUNCTION||'',code:e.CODE||'',message:String(e.MESSAGE||'').slice(0,180)}))};
+  };
+  if(force)return build();
+  return CACHED_GET_('MASTER_CONTROL_V1',120,build);
+}
+
+function P1_GET_MASTER_CONTROL_(requesterEmpCode){
+  const requester=FIND_EMPLOYEE_FULL_(requesterEmpCode);if(!requester)return{ok:false,err:'Valid employee required'};
+  P1_ENSURE_MASTER_CONTROL_FRESH_();
+  const snap=P1_MASTER_CONTROL_SNAPSHOT_(false),avatars=snap.avatars.filter(a=>{const target=FIND_EMPLOYEE_FULL_(a.EMP_CODE);return P1_CAN_SEE_EMP_(requester,target);});
+  const allowedCodes={};avatars.forEach(a=>allowedCodes[a.EMP_CODE]=1);const full=P1_HAS_MASTER_ACCESS_(requester),roleDept=(String(requester.ROLE||'')+' '+String(requester.DEPARTMENT||'')).toUpperCase();
+  const processes=full?snap.processes:snap.processes.filter(p=>roleDept.includes(p.PROCESS)||String(p.OWNER_ROLE||'').split('/').some(x=>roleDept.includes(x)));
+  return{ok:true,scope:full?'ALL':String(requester.DASHBOARD_ACCESS||'SELF').toUpperCase(),summary:full?snap.summary:{employees:avatars.length,openCases:avatars.reduce((s,x)=>s+x.OPEN_CASES,0),tatBreaches:avatars.reduce((s,x)=>s+x.TAT_BREACHES,0),bugs:avatars.reduce((s,x)=>s+x.ERRORS_24H,0),processIssues:processes.filter(x=>x.STATUS!=='OK'&&x.STATUS!=='ACTIVE').length},avatars,processes,bugs:full?snap.bugs:snap.bugs.filter(b=>allowedCodes[String(b.code||'').toUpperCase()])};
+}
+
+function P1_FORMAT_MASTER_CONTROL_(requesterEmpCode){
+  const r=P1_GET_MASTER_CONTROL_(requesterEmpCode);if(!r.ok)return'Access denied: '+r.err;
+  const s=r.summary,lines=[`SYSTEM CONTROL (${r.scope})`,`Employees:${s.employees||0} | Open:${s.openCases||0} | TAT breaches:${s.tatBreaches||0} | Bugs:${s.bugs||0} | Process issues:${s.processIssues||0}`];
+  (r.processes||[]).filter(p=>p.STATUS!=='OK'&&p.STATUS!=='ACTIVE').forEach(p=>lines.push(`PROCESS ${p.PROCESS} | ${p.STATUS} | Pending:${p.PENDING} | ${p.NEXT_ACTION}`));
+  r.avatars.filter(a=>a.AVATAR_STATUS!=='OK').sort((a,b)=>b.TAT_BREACHES-a.TAT_BREACHES).slice(0,15).forEach(a=>lines.push(`${a.EMP_CODE} ${a.EMPLOYEE_NAME} | ${a.ROLE} | ${a.AVATAR_STATUS} | Open:${a.OPEN_CASES} | ${a.NEXT_ACTION}`));
+  if(lines.length===2)lines.push('All visible avatars are operating normally.');
+  return lines.join('\n');
+}
+
+function P1_LOG_AVATAR_ACTIVITY_(empCode,type,summary,outcome,score){
+  try{const emp=FIND_EMPLOYEE_FULL_(empCode),sh=GET_OR_CREATE_('AVATAR_ACTIVITY_LOG'),h=P1_ENSURE_HEADERS_(sh,P1_TAB_MAP.AVATAR_ACTIVITY_LOG());sh.appendRow(P1_BUILD_ROW_(h,{TIMESTAMP:new Date(),EMP_CODE:String(empCode||'').toUpperCase(),ROLE:emp?emp.ROLE:'',ACTIVITY_TYPE:type||'',SUMMARY:String(summary||'').slice(0,200),OUTCOME:String(outcome||'').slice(0,100),SCORE:Number(score||0)}));SC_.remove('MASTER_CONTROL_V1');}catch(_){}
+}
+
+function SYNC_MASTER_CONTROL_CENTER_(){
+  const snap=P1_MASTER_CONTROL_SNAPSHOT_(true),sh=GET_OR_CREATE_('SYSTEM_CONTROL'),headers=P1_TAB_MAP.SYSTEM_CONTROL();
+  sh.clearContents();sh.getRange(1,1,1,headers.length).setValues([headers]);
+  if(snap.avatars.length)sh.getRange(2,1,snap.avatars.length,headers.length).setValues(snap.avatars.map(a=>P1_BUILD_ROW_(headers,a)));
+  const processSh=GET_OR_CREATE_('SYSTEM_PROCESS_CONTROL'),processHeaders=P1_TAB_MAP.SYSTEM_PROCESS_CONTROL();processSh.clearContents();processSh.getRange(1,1,1,processHeaders.length).setValues([processHeaders]);
+  if(snap.processes.length)processSh.getRange(2,1,snap.processes.length,processHeaders.length).setValues(snap.processes.map(p=>P1_BUILD_ROW_(processHeaders,p)));
+  try{styleHeaderRow_(sh,headers.length);sh.setFrozenRows(1);sh.autoResizeColumns(1,headers.length);}catch(_){}
+  try{styleHeaderRow_(processSh,processHeaders.length);processSh.setFrozenRows(1);processSh.autoResizeColumns(1,processHeaders.length);}catch(_){}
+  PropertiesService.getScriptProperties().setProperty('MASTER_CONTROL_LAST_SYNC',new Date().toISOString());SC_.remove('MASTER_CONTROL_V1');
+  return snap.summary;
+}
+
+function P1_ENSURE_MASTER_CONTROL_FRESH_(){
+  const props=PropertiesService.getScriptProperties(),last=new Date(props.getProperty('MASTER_CONTROL_LAST_SYNC')||0).getTime()||0;if(Date.now()-last<=60*60000)return;
+  const lock=LockService.getScriptLock();if(!lock.tryLock(3000))return;
+  try{const fresh=new Date(props.getProperty('MASTER_CONTROL_LAST_SYNC')||0).getTime()||0;if(Date.now()-fresh>60*60000)SYNC_MASTER_CONTROL_CENTER_();}catch(e){LOG_ERR_('MASTER_CONTROL_REFRESH','',e.message);}finally{try{lock.releaseLock();}catch(_){}}
+}
+
 /* ================================================================
    SECTION 11 — PRODUCTS + TAT (ScriptCache 1h)
    ================================================================ */
 
-function DEFAULT_PRODUCTS_() {
-  return [{code:'PL',name:'Personal Loan',icon:'💳',tat:3,roi:10.5},
-          {code:'BL',name:'Business Loan',icon:'🏢',tat:7,roi:16},
-          {code:'HL',name:'Home Loan',icon:'🏠',tat:15,roi:8.5},
-          {code:'LAP',name:'Loan Against Property',icon:'🏦',tat:15,roi:10.5},
-          {code:'AUTO',name:'Auto Loan',icon:'🚗',tat:5,roi:9.5}];
+let LOAN_BANK_CATALOG_CACHE_ = null;
+
+function GET_PRODUCT_ICON_(loanType) {
+  const value=String(loanType||'').toLowerCase();
+  if(value.includes('personal'))return'💳';
+  if(value.includes('business'))return'🏢';
+  if(value.includes('home'))return'🏠';
+  if(value.includes('property')||value.includes('lap')||value.includes('mortgage'))return'🏦';
+  if(value.includes('auto')||value.includes('car'))return'🚗';
+  if(value.includes('gold'))return'🪙';
+  return'💼';
 }
 
-function GET_PRODUCT_ICON_(t){
-  t=String(t||'').toLowerCase();
-  if(t.includes('personal'))return'💳'; if(t.includes('business'))return'🏢';
-  if(t.includes('home'))return'🏠'; if(t.includes('property')||t.includes('lap'))return'🏦';
-  if(t.includes('auto')||t.includes('car'))return'🚗'; return'💼';
+// Upsert without erasing existing values when an incoming optional field is blank.
+function UPSERT_MERGE_BY_KEY_(sh,keyHeader,rowObj,headers) {
+  const aH=P1_ENSURE_HEADERS_(sh,headers),nH=aH.map(DC_NORM_);
+  const kIdx=nH.indexOf(DC_NORM_(keyHeader)),kVal=String(P1_VAL_(rowObj,keyHeader)||'').trim();
+  if(kIdx<0||!kVal){sh.appendRow(P1_BUILD_ROW_(aH,rowObj));return sh.getLastRow();}
+  const lr=sh.getLastRow();
+  if(lr>=2){
+    const keys=sh.getRange(2,kIdx+1,lr-1,1).getValues();
+    for(let i=0;i<keys.length;i++)if(String(keys[i][0]||'').trim()===kVal){
+      const old=sh.getRange(i+2,1,1,aH.length).getValues()[0];
+      const incoming=P1_BUILD_ROW_(aH,rowObj);
+      const merged=old.map((v,j)=>incoming[j]!==''&&incoming[j]!==null&&incoming[j]!==undefined?incoming[j]:v);
+      sh.getRange(i+2,1,1,aH.length).setValues([merged]);return i+2;
+    }
+  }
+  sh.appendRow(P1_BUILD_ROW_(aH,rowObj));return sh.getLastRow();
 }
 
-function GET_ACTIVE_LOAN_PRODUCTS_() {
-  if (PRODUCTS_CACHE_) return PRODUCTS_CACHE_;
-  PRODUCTS_CACHE_ = CACHED_GET_('LOAN_PRODUCTS_V1', 3600, () => {
-    try {
-      const sh=SHEET_('Loan_Bank_Map'); if(!sh||sh.getLastRow()<2) return DEFAULT_PRODUCTS_();
-      const data=sh.getDataRange().getValues(); const h=data[0].map(DC_NORM_);
-      const iT=h.indexOf('LOAN_TYPE'), iB=h.indexOf('PREFERRED_BANK')!==-1?h.indexOf('PREFERRED_BANK'):h.indexOf('BANK');
-      const iS=h.indexOf('CASE_CATEGORY'), iROI=h.indexOf('ROI_START')!==-1?h.indexOf('ROI_START'):h.indexOf('ROI'), iTat=h.indexOf('TAT_DAYS');
-      if(iT===-1) return DEFAULT_PRODUCTS_();
-      const out={};
-      for(let r=1;r<data.length;r++){
-        const type=String(data[r][iT]||'').trim(); if(!type)continue;
-        const status=iS>-1?String(data[r][iS]||'ACTIVE').toUpperCase():'ACTIVE';
-        if(!['ACTIVE','YES','LIVE',''].includes(status))continue;
-        const key=type.toUpperCase(), bank=iB>-1?String(data[r][iB]||'').trim():'';
-        const roi=Number(iROI>-1?data[r][iROI]:'')||10.5, tat=Number(iTat>-1?data[r][iTat]:'')||7;
-        if(!out[key]) out[key]={code:key.replace(/[^A-Z0-9]/g,'').slice(0,4),name:type,icon:GET_PRODUCT_ICON_(type),tat,roi,banks:[]};
-        if(bank) out[key].banks.push(bank);
-        out[key].roi=Math.min(Number(out[key].roi),roi); out[key].tat=Math.min(Number(out[key].tat),tat);
-      }
-      const p=Object.keys(out).map(k=>{out[k].bankCount=[...new Set(out[k].banks)].length;return out[k];});
-      return p.length?p:DEFAULT_PRODUCTS_();
-    } catch(e){ LOG_ERR_('GET_ACTIVE_LOAN_PRODUCTS','',e.message); return DEFAULT_PRODUCTS_(); }
+function GET_LOAN_BANK_CATALOG_() {
+  if(LOAN_BANK_CATALOG_CACHE_)return LOAN_BANK_CATALOG_CACHE_;
+  const empty={products:[],banks:{},rules:[]};
+  const sh=SHEET_('Loan_Bank_Map');
+  if(!sh||sh.getLastRow()<2)return(LOAN_BANK_CATALOG_CACHE_=empty);
+  const data=sh.getDataRange().getValues(),headers=data[0].map(DC_NORM_);
+  const col=(...names)=>{for(const name of names){const i=headers.indexOf(DC_NORM_(name));if(i>-1)return i;}return-1;};
+  const idx={loan:col('LOAN_TYPE'),bank:col('BANK','PREFERRED_BANK'),status:col('STATUS','CASE_CATEGORY'),tat:col('TAT_DAYS'),roi:col('ROI_START','ROI'),minCibil:col('MIN_CIBIL'),minIncome:col('MIN_INCOME'),maxFoir:col('MAX_FOIR'),maxLoan:col('MAX_LOAN_AMOUNT'),documents:col('DOCUMENTS_REQUIRED'),policy:col('POLICY_REMARKS','NOTES'),reminder:col('REMINDER_DAYS'),lastDayTat:col('LAST_DAY_TAT'),priority:col('PRIORITY')};
+  if(idx.loan<0||idx.bank<0)return(LOAN_BANK_CATALOG_CACHE_=empty);
+  const groups={},rules=[],codeMap={'PERSONAL LOAN':'PL','BUSINESS LOAN':'BL','HOME LOAN':'HL','HOME LOAN AND LAP':'HL','LOAN AGAINST PROPERTY':'LAP','AUTO LOAN':'AUTO','GOLD LOAN':'GL','WORKING CAPITAL':'WC','MORTGAGE LOAN':'ML'};
+  const num=(row,i)=>i>-1&&row[i]!==''?Number(row[i]):null,txt=(row,i)=>i>-1?String(row[i]||'').trim():'';
+  for(let r=1;r<data.length;r++){
+    const row=data[r],loanType=txt(row,idx.loan),bank=txt(row,idx.bank),status=(txt(row,idx.status)||'ACTIVE').toUpperCase();
+    if(!loanType||!bank||!['ACTIVE','YES','LIVE'].includes(status))continue;
+    const key=loanType.toUpperCase(),tat=num(row,idx.tat),roi=num(row,idx.roi),documents=txt(row,idx.documents);
+    const rule={loanType,bank,status,tatDays:tat,roiStart:roi,minCibil:num(row,idx.minCibil),minIncome:num(row,idx.minIncome),maxFoir:num(row,idx.maxFoir),maxLoanAmount:num(row,idx.maxLoan),reminderDays:num(row,idx.reminder),lastDayTat:num(row,idx.lastDayTat),priority:num(row,idx.priority),documentsRequired:documents,policyRemarks:txt(row,idx.policy)};
+    rules.push(rule);
+    if(!groups[key]){const generatedCode=key.split(/\s+/).map(x=>x.charAt(0)).join('').slice(0,4)||key.slice(0,4);groups[key]={code:codeMap[key]||generatedCode,name:loanType,icon:GET_PRODUCT_ICON_(loanType),tat:tat||7,roi:roi||0,banks:[],documents:[],rules:[]};}
+    const product=groups[key];
+    if(!product.banks.includes(bank))product.banks.push(bank);
+    if(tat&&tat<product.tat)product.tat=tat;
+    if(roi&&(!product.roi||roi<product.roi))product.roi=roi;
+    if(documents)documents.split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean).forEach(doc=>{if(!product.documents.includes(doc))product.documents.push(doc);});
+    product.rules.push(rule);
+  }
+  const products=Object.keys(groups).map(key=>groups[key]),banks={};
+  products.forEach(product=>{banks[product.name.toUpperCase()]=product.banks.slice();});
+  return(LOAN_BANK_CATALOG_CACHE_={products,banks,rules});
+}
+
+function GET_ACTIVE_LOAN_PRODUCTS_(){return GET_LOAN_BANK_CATALOG_().products;}
+function P1_GET_BANK_OPTIONS_MAP_(){return GET_LOAN_BANK_CATALOG_().banks;}
+function P1_GET_LOAN_CATALOG(){const c=GET_LOAN_BANK_CATALOG_();return{products:c.products,banks:c.banks,docsApi:true};}
+
+function P1_DOC_REQUIREMENTS_(loanType,employmentType,preferredBank){
+  const loan=String(loanType||'').trim().toUpperCase(),emp=String(employmentType||'').trim().toUpperCase();
+  const common=['PAN or Form 60, where applicable','One RBI-valid OVD (Aadhaar possession proof / Passport / Driving Licence / Voter ID / NREGA job card / NPR letter)','Recent photograph'];
+  const salaried=['Last 3 months salary slips','Last 6 months salary-account bank statement','Form 16 or latest ITR','Employment proof / employee ID'];
+  const business=['Business/constitution proof (GST / Udyam / incorporation / partnership deed)','Entity PAN and registered-address proof, where applicable','Authorised-signatory / beneficial-owner KYC and authority resolution, where applicable','Last 2 years ITR with computation','Last 2 years audited financials','Last 12 months primary bank statements','GST returns, where applicable'];
+  const property=['Property title/chain documents','Sale agreement / allotment letter','Approved building plan','Latest property-tax receipt','Builder/society NOC, where applicable'];
+  const catalog=GET_LOAN_BANK_CATALOG_(),product=catalog.products.find(x=>String(x.name||'').toUpperCase()===loan);
+  const selected=String(preferredBank||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+  const bankDocs=catalog.rules.filter(r=>String(r.loanType||'').toUpperCase()===loan&&(!selected.length||selected.includes(String(r.bank||'').toUpperCase()))).flatMap(r=>String(r.documentsRequired||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean));
+  let docs=Array.from(new Set([...(product&&product.documents||[]),...bankDocs]));
+  const add=list=>list.forEach(x=>{if(!docs.some(d=>String(d).toUpperCase()===String(x).toUpperCase()))docs.push(x);});
+  add(common);
+  if(emp==='SALARIED')add(salaried);else if(emp==='SELF_EMPLOYED'||emp==='BUSINESS')add(business);
+  if(/HOME|PROPERTY|MORTGAGE|LAP/.test(loan))add(property);
+  if(/AUTO|VEHICLE|CAR/.test(loan))add(['Vehicle quotation / proforma invoice']);
+  if(/EDUCATION/.test(loan))add(['Admission/offer letter','Course fee structure','Academic records','Co-applicant income documents']);
+  if(/TAKEOVER|BALANCE TRANSFER/.test(loan))add(['Existing loan statement','Existing sanction letter','Foreclosure / outstanding letter']);
+  return docs;
+}
+
+function P1_GET_DOC_REQUIREMENTS(loanType,employmentType,preferredBank){
+  return{ok:true,documents:P1_DOC_REQUIREMENTS_(loanType,employmentType,preferredBank),source:'Loan_Bank_Map bank rules plus applicable KYC/product baseline'};
+}
+
+function P1_ROUTE_SIGNATURE_(empCode,email){return P1_B64URL_(Utilities.computeHmacSha256Signature(String(empCode||'').toUpperCase()+'|'+DC_CLEAN_EMAIL_(email),DC_CFG.API_KEY,Utilities.Charset.UTF_8));}
+function P1_VERIFY_ROUTE_SIGNATURE_(empCode,email,signature){return!!DC_CFG.API_KEY&&P1_CONST_EQ_(P1_ROUTE_SIGNATURE_(empCode,email),String(signature||''));}
+function P1_ISSUE_UPLOAD_TOKEN(submissionKey,routeKey){
+  submissionKey=String(submissionKey||'').trim();routeKey=String(routeKey||'').trim().toLowerCase();if(!/^[A-Za-z0-9_-]{16,120}$/.test(submissionKey))throw new Error('Valid submission session required');
+  const token=Utilities.getUuid().replace(/-/g,''),binding=P1_IDEMPOTENCY_CACHE_KEY_(submissionKey+'|'+routeKey);
+  CacheService.getScriptCache().put('UPLOAD_TOKEN_'+token,JSON.stringify({binding,issuedAt:Date.now()}),1200);
+  return token;
+}
+
+function P1_CONSUME_UPLOAD_TOKEN_(token,submissionKey,routeKey){
+  token=String(token||'').trim();if(!token)return false;
+  const cache=CacheService.getScriptCache(),key='UPLOAD_TOKEN_'+token,raw=cache.get(key);if(!raw)return false;
+  try{const meta=JSON.parse(raw),expected=P1_IDEMPOTENCY_CACHE_KEY_(String(submissionKey||'').trim()+'|'+String(routeKey||'').trim().toLowerCase()),valid=P1_CONST_EQ_(meta.binding,expected);if(valid)cache.remove(key);return valid;}catch(_){cache.remove(key);return false;}
+}
+
+function P1_RATE_LIMIT_INTAKE_(p){
+  const identity=DC_CLEAN_MOBILE_(p.client_mobile||p.CLIENT_MOBILE||p.mobile||'')||DC_CLEAN_EMAIL_(p.client_email||p.CLIENT_EMAIL||p.email||'')||String(p.submission_key||'');
+  const key='P1_RATE_'+P1_IDEMPOTENCY_CACHE_KEY_(String(p.entry_type||p.ENTRY_TYPE||'')+'|'+identity).replace('P1_SUBMIT_',''),cache=CacheService.getScriptCache(),count=Number(cache.get(key)||0);
+  if(count>=5)return false;cache.put(key,String(count+1),3600);return true;
+}
+
+function P1_CLIENT_DOCS_ROOT_(){
+  const props=PropertiesService.getScriptProperties();
+  let id=props.getProperty('CLIENT_DOCS_FOLDER_ID')||'';
+  if(id){try{return DriveApp.getFolderById(id);}catch(_){}}
+  const folders=DriveApp.getFoldersByName('DIVYANSHI_CLIENT_DOCUMENTS');
+  const folder=folders.hasNext()?folders.next():DriveApp.createFolder('DIVYANSHI_CLIENT_DOCUMENTS');
+  props.setProperty('CLIENT_DOCS_FOLDER_ID',folder.getId());
+  return folder;
+}
+
+function P1_DETECT_UPLOAD_MIME_(bytes){
+  const b=i=>((bytes[i]||0)&255);
+  if(bytes.length>=4&&b(0)===0x25&&b(1)===0x50&&b(2)===0x44&&b(3)===0x46)return'application/pdf';
+  if(bytes.length>=3&&b(0)===0xff&&b(1)===0xd8&&b(2)===0xff)return'image/jpeg';
+  if(bytes.length>=8&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((v,i)=>b(i)===v))return'image/png';
+  return'';
+}
+
+function P1_SAVE_CLIENT_DOCS_(p,caseId){
+  const supplied=Array.isArray(p.files)?p.files:[];
+  if(supplied.length>8)throw new Error('Maximum 8 files allowed');
+  const files=supplied.slice(0,8);
+  const estimatedBytes=files.reduce((sum,f)=>sum+Math.floor(String(f.base64||'').length*0.75),0);
+  if(estimatedBytes>10*1024*1024)throw new Error('Total upload exceeds 10 MB');
+  if(!files.length)return{folderUrl:String(p.docs_link||p.DOCS_LINK||''),names:[]};
+  const allowed=/^(application\/pdf|image\/(jpeg|png))$/i;
+  const prepared=files.map(f=>{
+    const mime=String(f.mimeType||'application/octet-stream').toLowerCase(),raw=String(f.base64||'');
+    if(!allowed.test(mime))throw new Error(`Unsupported file type: ${f.name||'document'}`);
+    if(!raw)throw new Error(`Empty file data: ${f.name||'document'}`);
+    const b64=raw.includes(',')?raw.split(',').pop():raw,bytes=Utilities.base64Decode(b64);
+    if(bytes.length>5*1024*1024)throw new Error(`File exceeds 5 MB: ${f.name||'document'}`);
+    const detected=P1_DETECT_UPLOAD_MIME_(bytes);
+    if(!detected||detected!==mime)throw new Error(`File content/type mismatch: ${f.name||'document'}`);
+    const clean=String(f.name||'document').replace(/[\\/:*?"<>|]/g,'_').slice(0,120);
+    return{mime,bytes,clean};
   });
-  return PRODUCTS_CACHE_;
+  const root=P1_CLIENT_DOCS_ROOT_(),folderName=`CASE_${String(caseId||Utilities.getUuid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,60)}`;
+  const existing=root.getFoldersByName(folderName),folder=existing.hasNext()?existing.next():root.createFolder(folderName);
+  const names=[],fileIds=[];
+  try{prepared.forEach(f=>{const saved=folder.createFile(Utilities.newBlob(f.bytes,f.mime,f.clean));names.push(f.clean);fileIds.push(saved.getId());});}
+  catch(e){fileIds.forEach(id=>{try{DriveApp.getFileById(id).setTrashed(true);}catch(_){}});throw e;}
+  if(files.length&&!names.length)throw new Error('No valid document was uploaded');
+  return{folderUrl:folder.getUrl(),names,fileIds};
 }
 
-function P1_GET_BANK_OPTIONS_MAP_() {
-  if (BANKS_CACHE_) return BANKS_CACHE_;
-  BANKS_CACHE_ = CACHED_GET_('BANK_OPTIONS_V1', 3600, () => {
-    const out={};
-    try {
-      const sh=SHEET_('Loan_Bank_Map'); if(!sh||sh.getLastRow()<2)return out;
-      const data=sh.getDataRange().getValues(); const h=data[0].map(DC_NORM_);
-      const iT=h.indexOf('LOAN_TYPE'), iB=h.indexOf('PREFERRED_BANK')!==-1?h.indexOf('PREFERRED_BANK'):h.indexOf('BANK'), iS=h.indexOf('CASE_CATEGORY');
-      if(iT===-1||iB===-1)return out;
-      for(let r=1;r<data.length;r++){
-        const loan=String(data[r][iT]||'').trim(), bank=String(data[r][iB]||'').trim();
-        const status=iS>-1?String(data[r][iS]||'ACTIVE').toUpperCase():'ACTIVE';
-        if(!loan||!bank||!['ACTIVE','YES','LIVE',''].includes(status))continue;
-        const key=loan.toUpperCase(); if(!out[key])out[key]=[]; if(!out[key].includes(bank))out[key].push(bank);
-      }
-    } catch(e){ LOG_ERR_('P1_GET_BANK_OPTIONS_MAP','',e.message); }
-    return out;
-  });
-  return BANKS_CACHE_;
+function P1_DOC_AUDIT_(p,upload){
+  const required=P1_DOC_REQUIREMENTS_(p.loan_type,p.employment_type,p.preferred_bank),selected=Array.isArray(p.selected_documents)?p.selected_documents:[];
+  const evidence=(upload.names||[]).map(x=>String(x).toUpperCase());
+  const token=s=>String(s).toUpperCase().replace(/[^A-Z0-9 ]/g,' ').split(/\s+/).filter(x=>x.length>3);
+  const received=required.filter(req=>{const t=token(req);return evidence.some(e=>t.some(k=>e.includes(k)));});
+  const missing=required.filter(x=>!received.includes(x)),status=!upload.names.length?'NOT_UPLOADED':'AI_REVIEW_PENDING';
+  return{status,required,received,missing,summary:`${status} | Uploaded ${upload.names.length} file(s) | Human/lender verification required`,text:`Required: ${required.join('; ')}\nApplicant declared: ${selected.join('; ')||'None'}\nFilename pre-match: ${received.join('; ')||'None'}\nPending/unclear: ${missing.join('; ')||'None'}\nAI output is assistance only; final document acceptance is by authorised staff/lender.`};
 }
 
-function GET_TAT_BY_PRODUCT_(loanType) {
-  const key=String(loanType||'').trim().toUpperCase();
-  const p=GET_ACTIVE_LOAN_PRODUCTS_().find(x=>x.name.toUpperCase()===key||x.code===key);
-  return p?p.tat:7;
+function GET_TAT_BY_PRODUCT_(loanType,preferredBank){
+  const key=String(loanType||'').trim().toUpperCase(),catalog=GET_LOAN_BANK_CATALOG_();
+  const selected=String(preferredBank||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+  if(selected.length){const matching=catalog.rules.filter(rule=>rule.loanType.toUpperCase()===key&&selected.includes(rule.bank.toUpperCase())&&Number(rule.tatDays)>0);if(matching.length)return Math.min.apply(null,matching.map(rule=>Number(rule.tatDays)));}
+  const product=catalog.products.find(p=>p.name.toUpperCase()===key||p.code.toUpperCase()===key);
+  return product?Number(product.tat)||7:7;
 }
 
-function COMPUTE_TAT_(loanType) {
-  const tat=GET_TAT_BY_PRODUCT_(loanType);
-  return {TAT_DAYS:tat, TAT_DEADLINE:new Date(Date.now()+tat*86400000), TAT_STATUS:'ACTIVE'};
+function COMPUTE_TAT_(loanType,preferredBank){const tat=GET_TAT_BY_PRODUCT_(loanType,preferredBank);return{TAT_DAYS:tat,TAT_DEADLINE:new Date(Date.now()+tat*86400000),TAT_STATUS:'ACTIVE'};}
+
+function P1_IDEMPOTENCY_CACHE_KEY_(raw){
+  if(!String(raw||'').trim())return'';
+  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(raw).trim());
+  return'P1_SUBMIT_'+Utilities.base64EncodeWebSafe(digest).replace(/=+$/,'');
+}
+function P1_IDEMPOTENCY_BEGIN_(raw){
+  const key=P1_IDEMPOTENCY_CACHE_KEY_(raw);if(!key)return{ok:false,err:'Submission key missing'};
+  const lock=LockService.getScriptLock();if(!lock.tryLock(5000))return{ok:false,err:'System busy. Retry shortly.'};
+  try{const cache=CacheService.getScriptCache(),hit=cache.get(key);if(hit){if(hit.indexOf('DONE:')===0){try{return{ok:true,replay:JSON.parse(hit.slice(5)),key};}catch(_){}}return{ok:false,err:'This submission is already processing. Please wait.'};}cache.put(key,'BUSY',600);return{ok:true,key};}
+  finally{lock.releaseLock();}
+}
+function P1_IDEMPOTENCY_FINISH_(state,result){
+  if(!state||!state.key)return result;
+  const cache=CacheService.getScriptCache();
+  if(result&&(result.ok||result.success)){try{cache.put(state.key,'DONE:'+JSON.stringify(result),21600);}catch(_){}}
+  else cache.remove(state.key);
+  return result;
 }
 
 /* ================================================================
    SECTION 12 — MAIN LEAD PIPELINE (6 stages)
    ================================================================ */
 
-function P1_SMART_FORM_SUBMIT_(p) {
+// Website leads arrive through the authenticated Loan OS server, never from a
+// browser directly. Routing remains SSOT-driven through one approved employee.
+function P1_WEBSITE_LEAD_SUBMIT_(p) {
+  p=p||{};
+  const props=PropertiesService.getScriptProperties(),routeKey=String(props.getProperty('WEBSITE_ROUTE_EMP_CODE')||props.getProperty('WEBSITE_MANAGER_EMAIL_ID')||'').trim();
+  const routeEmp=FIND_EMPLOYEE_FULL_(routeKey),privacy=P1_GET_HR_PUBLIC_CONFIG();
+  if(!routeEmp)return{ok:false,err:'Website routing is not configured. Set WEBSITE_ROUTE_EMP_CODE or WEBSITE_MANAGER_EMAIL_ID.'};
+  if(!privacy.privacyConfigured||!privacy.consentVersion)return{ok:false,err:'Website privacy configuration is incomplete.'};
+  const consent=P1_BOOL_YES_(p.data_consent||p.DATA_CONSENT),aiNotice=P1_BOOL_YES_(p.ai_notice_accepted||p.AI_NOTICE_ACCEPTED);
+  if(!consent||!aiNotice)return{ok:false,err:'Website consent and AI notice acknowledgement are required.'};
+  return P1_SMART_FORM_SUBMIT_({
+    ...p,
+    entry_type:'CLIENT_ENTRY',source_name:'Website',source_type:'WEBSITE',
+    manager_email_id:'',emp_code:routeEmp.EMP_CODE,
+    data_consent:'YES',ai_notice_accepted:'YES',consent_version:privacy.consentVersion,
+    privacy_notice_url:privacy.privacyUrl,consent_source:'WEBSITE_WEBHOOK',submission_key:String(p.submission_key||Utilities.getUuid()).replace(/[^A-Za-z0-9_-]/g,'').slice(0,120)
+  },true);
+}
+
+function P1_SMART_FORM_SUBMIT_(p,trustedTrigger) {
+  let idem=null;
   try {
     p=p||{};
-    const entryType=String(p.entry_type||'SALES_LEAD').trim().toUpperCase();
-    const isPeople=['NEW_STAFF_ENTRY','INTERVIEW_ENTRY'].includes(entryType);
-    const mobile=DC_CLEAN_MOBILE_(p.client_mobile||p.CLIENT_MOBILE||p.mobile||'');
-    const clientName=String(p.client_name||p.CLIENT_NAME||p.full_name||'').trim();
-    const loanType=String(p.loan_type||p.LOAN_TYPE||'').trim();
-    if(clientName.length<2 || !/^[6-9]\d{9}$/.test(mobile)) return {ok:false,err:'Enter a valid name and 10-digit Indian mobile number.'};
-    if(isPeople ? !p.candidate_consent : !p.data_consent) return {ok:false,err:'Privacy consent is required.'};
-    if(!isPeople && (!loanType || !String(p.employment_type||'').trim() || Number(p.required_loan_amount||p.amount||0)<1000)) return {ok:false,err:'Loan type, employment type and amount of at least INR 1,000 are required.'};
-    const configuredVersion=String(PropertiesService.getScriptProperties().getProperty('CONSENT_VERSION')||'').trim();
-    const configuredPrivacy=String(PropertiesService.getScriptProperties().getProperty('PRIVACY_URL')||'').trim();
-    if(!configuredVersion || !configuredPrivacy || String(p.consent_version||'')!==configuredVersion) return {ok:false,err:'Consent configuration is unavailable. Please contact support.'};
-    const referredEmp=String(p.emp_code||p.EMP_CODE||'').trim().toUpperCase();
-    const employee=referredEmp?FIND_EMPLOYEE_FULL_(referredEmp):null;
-    if(!isPeople && !employee) return {ok:false,err:'This referral link is not assigned to an active employee.'};
+    const entryType=String(p.entry_type||p.ENTRY_TYPE||'').trim().toUpperCase();
+    const submissionKey=String(p.submission_key||p.SUBMISSION_KEY||(trustedTrigger?Utilities.getUuid():'')).trim();
+    if(!trustedTrigger&&!/^[A-Za-z0-9_-]{16,120}$/.test(submissionKey))return{ok:false,err:'Submission session missing. Refresh the form.'};
+    if(!trustedTrigger&&String(p.website||p.company_website||'').trim())return{ok:false,err:'Submission rejected'};
+    if(!trustedTrigger&&!P1_RATE_LIMIT_INTAKE_(p))return{ok:false,err:'Too many submissions. Try again later.'};
+    const routeKey=DC_CLEAN_EMAIL_(p.manager_email_id||p.manager_email||p.MANAGER_EMAIL_ID||p.MANAGER_EMAIL||'')||String(p.emp_code||p.EMP_CODE||'').trim().toUpperCase();
+    if(!trustedTrigger&&!P1_CONSUME_UPLOAD_TOKEN_(p.upload_token,submissionKey,routeKey))return{ok:false,err:'Form session expired. Refresh and retry.'};
+    idem=P1_IDEMPOTENCY_BEGIN_(submissionKey);
+    if(!idem.ok)return{ok:false,err:idem.err};
+    if(idem.replay)return idem.replay;
+    const finish=result=>P1_IDEMPOTENCY_FINISH_(idem,result);
+    const privacy=P1_GET_HR_PUBLIC_CONFIG();
+    if(!trustedTrigger&&(!privacy.privacyConfigured||!privacy.consentVersion))return finish({ok:false,err:'Privacy notice is not configured. Contact support.'});
+    if(entryType==='NEW_STAFF_ENTRY')return finish(P1_NEW_STAFF_ENTRY_(p));
+    if(entryType==='INTERVIEW_ENTRY')return finish(P1_INTERVIEW_ENTRY_(p));
+    const consent=p.data_consent===true||String(p.data_consent||'').trim().toUpperCase()==='YES';
+    if(!consent)return finish({ok:false,err:'Data processing consent required'});
+    const aiNotice=p.ai_notice_accepted===true||String(p.ai_notice_accepted||p.AI_NOTICE_ACCEPTED||'').trim().toUpperCase()==='YES';
+    if(!aiNotice)return finish({ok:false,err:'AI assistance notice acknowledgement required'});
+    const clientName=String(p.client_name||p.CLIENT_NAME||p.full_name||'').trim(),mobile=DC_CLEAN_MOBILE_(p.client_mobile||p.CLIENT_MOBILE||p.mobile||'');
+    if(!clientName||!mobile)return finish({ok:false,err:'Valid client name and 10-digit mobile required'});
+    const loanFlow=['SALES_LEAD','CLIENT_ENTRY','BANKER_ENTRY','DOC_UPLOAD'].includes(entryType);
+    if(loanFlow&&!String(p.loan_type||p.LOAN_TYPE||'').trim())return finish({ok:false,err:'Loan type required'});
+    if(loanFlow&&!String(p.employment_type||p.EMPLOYMENT_TYPE||'').trim())return finish({ok:false,err:'Employment type required'});
+    const amount=Number(p.required_loan_amount||p.REQUIRED_LOAN_AMOUNT||p.amount||0),age=p.age===''?null:Number(p.age),income=p.monthly_income===''?null:Number(p.monthly_income),emi=p.existing_emi===''?null:Number(p.existing_emi),cibil=p.cibil_score===''?null:Number(p.cibil_score);
+    if(loanFlow&&(!Number.isFinite(amount)||amount<1000))return finish({ok:false,err:'Required amount must be at least INR 1,000'});
+    if(age!==null&&(!Number.isFinite(age)||age<18||age>80))return finish({ok:false,err:'Age must be between 18 and 80'});
+    if(income!==null&&(!Number.isFinite(income)||income<0))return finish({ok:false,err:'Monthly income cannot be negative'});
+    if(emi!==null&&(!Number.isFinite(emi)||emi<0))return finish({ok:false,err:'Existing EMI cannot be negative'});
+    if(cibil!==null&&(!Number.isFinite(cibil)||cibil<300||cibil>900))return finish({ok:false,err:'CIBIL score must be between 300 and 900'});
+    const routeEmp=FIND_EMPLOYEE_FULL_(routeKey);
+    if(!routeEmp)return finish({ok:false,err:'Manager/staff routing key is invalid or inactive'});
+    if(!trustedTrigger&&!P1_VERIFY_ROUTE_SIGNATURE_(routeEmp.EMP_CODE,routeEmp.EMAIL,p.route_signature||p.ROUTE_SIGNATURE))return finish({ok:false,err:'Assigned staff link is invalid or expired'});
+    if(entryType==='DOC_UPLOAD'&&(!Array.isArray(p.files)||!p.files.length))return finish({ok:false,err:'Select at least one document to upload'});
+    const caseId='L'+mobile.slice(-4)+'_'+Date.now(),upload=P1_SAVE_CLIENT_DOCS_(p,caseId),docAudit=P1_DOC_AUDIT_(p,upload);
     const result=DC_PROCESS_LEAD_({
-      EMP_CODE:employee?employee.EMP_CODE:'',
-      MANAGER_EMAIL:employee?employee.MANAGER_EMAIL||'':'',
+      LEAD_ID:caseId,
+      EMP_CODE:routeEmp.EMP_CODE,
+      SALES_NAME:routeEmp.NAME,
+      MANAGER_EMAIL:routeEmp.MANAGER_EMAIL||routeEmp.EMAIL,
       CLIENT_NAME:clientName,
       CLIENT_MOBILE:mobile,
       CLIENT_EMAIL:DC_CLEAN_EMAIL_(p.client_email||p.CLIENT_EMAIL||p.email||''),
@@ -717,33 +1021,107 @@ function P1_SMART_FORM_SUBMIT_(p) {
       EXISTING_EMI:p.existing_emi||p.EXISTING_EMI||'0',
       AGE:p.age||p.AGE||'',
       CIBIL_SCORE:p.cibil_score||p.CIBIL_SCORE||p.credit_score||'',
-      LOAN_TYPE:loanType,
+      LOAN_TYPE:String(p.loan_type||p.LOAN_TYPE||'').trim(),
       PREFERRED_BANK:String(p.preferred_bank||p.PREFERRED_BANK||'').trim(),
       REQUIRED_LOAN_AMOUNT:String(p.required_loan_amount||p.REQUIRED_LOAN_AMOUNT||p.amount||'').trim(),
-      DOCS_LINK:p.docs_link||p.DOCS_LINK||'',
+      DOCS_LINK:upload.folderUrl||p.docs_link||p.DOCS_LINK||'',
+      DOC_STATUS:docAudit.status,
+      DOC_AUDIT:docAudit.text,
+      DATA_CONSENT:consent?'YES':'NO',
+      CONSENT_VERSION:String(p.consent_version||p.CONSENT_VERSION||privacy.consentVersion||'').trim(),
+      CONSENT_AT:p.consent_at||p.CONSENT_AT||new Date(),
+      CONSENT_SOURCE:String(p.consent_source||p.CONSENT_SOURCE||p.source_type||p.SOURCE_TYPE||'WEB_APP').trim(),
+      PRIVACY_NOTICE_URL:String(p.privacy_notice_url||p.PRIVACY_NOTICE_URL||privacy.privacyUrl||'').trim(),
+      AI_NOTICE_ACCEPTED:aiNotice?'YES':'NO',
+      MARKETING_CONSENT:P1_BOOL_YES_(p.marketing_consent||p.MARKETING_CONSENT)?'YES':'NO',
+      CAMPAIGN:String(p.campaign||p.CAMPAIGN||'').trim(),
+      FOLLOWUP_DATE:p.followup_date||p.FOLLOWUP_DATE||'',
       TASK_CATEGORY:p.task_category||p.TASK_CATEGORY||'NEW_LEAD',
       CASE_CATEGORY:p.case_category||p.CASE_CATEGORY||p.case_status||'OPEN',
       REMARKS:String(p.remarks||p.REMARKS||'').trim(),
       SOURCE_TYPE:p.source_type||p.SOURCE_TYPE||'WEB_APP',
-      SOURCE_NAME:p.source_name||p.SOURCE_NAME||'P1_SMART_FORM',
-      CONSENT_VERSION:configuredVersion,
-      CONSENT_AT:new Date(),
-      CONSENT_SOURCE:'WEB_APP',
-      PRIVACY_NOTICE_URL:configuredPrivacy,
-      SELECTED_DOCUMENTS:Array.isArray(p.selected_documents)?p.selected_documents.join(', ').slice(0,2000):''
+      SOURCE_NAME:p.source_name||p.SOURCE_NAME||'P1_SMART_FORM'
     });
-    if(!result||!result.ok) return result;
-    const files=Array.isArray(p.files)?p.files:[];
-    if(files.length){
-      const upload=P1_STORE_PUBLIC_FILES_(p, result.leadId||result.lid||'', files);
-      if(!upload.ok) return {ok:false,err:upload.err||'Documents were not saved; no submission was confirmed.'};
-      result.docsLink=upload.folderUrl;
-    }
-    return result;
-  } catch(e){ LOG_ERR_('P1_SMART_FORM_SUBMIT','',e.message); return {ok:false,err:e.message}; }
+    if(result&&result.ok){result.docAudit=docAudit.summary;result.docsLink=upload.folderUrl;result.docStatus=docAudit.status;}
+    else (upload.fileIds||[]).forEach(id=>{try{DriveApp.getFileById(id).setTrashed(true);}catch(_){}});
+    return finish(result);
+  } catch(e){ if(idem&&idem.key)CacheService.getScriptCache().remove(idem.key);const ref='ERR_'+Date.now();LOG_ERR_('P1_SMART_FORM_SUBMIT',ref,e.message); return {ok:false,err:'Submission could not be completed. Reference: '+ref}; }
 }
 
-function P1_SMART_FORM_SUBMIT(p){ return P1_SMART_FORM_SUBMIT_(p); }
+function P1_SMART_FORM_SUBMIT(p){ return P1_SMART_FORM_SUBMIT_(p,false); }
+
+function P1_CANDIDATE_ID_(p){
+  const mobile=DC_CLEAN_MOBILE_(p.client_mobile||p.mobile||p.MOBILE||'');
+  if(mobile)return 'CAND_'+mobile;
+  const email=DC_CLEAN_EMAIL_(p.client_email||p.email||p.EMAIL||'');
+  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.MD5,email||String(Date.now()));
+  return 'CAND_'+Utilities.base64EncodeWebSafe(digest).replace(/=+$/,'').slice(0,12).toUpperCase();
+}
+
+function P1_BOOL_YES_(value){return value===true||String(value||'').trim().toUpperCase()==='YES';}
+
+function P1_CANDIDATE_OBJ_(p){
+  const props=PropertiesService.getScriptProperties();
+  return {
+    TIMESTAMP:new Date(),CANDIDATE_ID:P1_CANDIDATE_ID_(p),
+    ENTRY_TYPE:String(p.entry_type||'').toUpperCase(),
+    EMPLOYEES_NAME:String(p.client_name||p.employees_name||p.EMPLOYEES_NAME||p.CANDIDATE_NAME||'').trim(),
+    EMPLOYEE_EMAIL_ID:DC_CLEAN_EMAIL_(p.client_email||p.employee_email_id||p.EMPLOYEE_EMAIL_ID||p.EMPLOYEE_EMAIL||p.EMAIL||''),
+    MOBILE:DC_CLEAN_MOBILE_(p.client_mobile||p.mobile||p.MOBILE||''),CITY:String(p.city_location||p.city||p.CITY_LOCATION||p.CITY||'').trim(),
+    DEPARTMENT:String(p.department||p.DEPARTMENT||'').trim(),ROLE:String(p.permission_role||p.role||p.ROLE||'APPLICANT').trim(),DESIGNATION:String(p.designation_applied||p.role_applied||p.DESIGNATION||p.ROLE_APPLIED||'').trim(),
+    EXPERIENCE_YEARS:p.experience_years||'',CURRENT_COMPANY:p.current_company||'',
+    CURRENT_CTC:p.current_ctc||'',EXPECTED_CTC:p.expected_ctc||'',NOTICE_PERIOD:p.notice_period||'',
+    SKILLS:p.skills||'',EDUCATION:p.education||'',INTERVIEWER_EMAIL:DC_CLEAN_EMAIL_(p.interviewer_email||''),
+    INTERVIEW_STATUS:String(p.interview_status||'PENDING').toUpperCase(),
+    MANAGER_NAME:p.manager_name||'',MANAGER_EMAIL_ID:DC_CLEAN_EMAIL_(p.manager_email_id||''),
+    SALARY_MONTHLY:p.salary_monthly||'',JOINING_DATE:p.joining_date||'',EMP_CODE:'',
+    STATUS:'PENDING',ACTIVE_STATUS:'PENDING',TC_ACCEPTED:P1_BOOL_YES_(p.tc_accepted||p.TC_ACCEPTED)?'YES':'NO',PRIVACY_CONSENT:P1_BOOL_YES_(p.candidate_consent||p.PRIVACY_CONSENT)?'YES':'NO',CONSENT_VERSION:String(p.consent_version||p.CONSENT_VERSION||props.getProperty('CONSENT_VERSION')||'').trim(),CONSENT_AT:p.consent_at||p.CONSENT_AT||new Date(),PRIVACY_NOTICE_URL:String(p.privacy_notice_url||p.PRIVACY_NOTICE_URL||props.getProperty('PRIVACY_NOTICE_URL')||'').trim(),
+    ONBOARD_DONE:'NO',REMARKS:String(p.remarks||'').trim()
+  };
+}
+
+function CREATE_CANDIDATE_RESUME_(candidate){
+  try{
+    const doc=DocumentApp.create(`${candidate.CANDIDATE_ID} - ${candidate.EMPLOYEES_NAME} - Candidate Profile`);
+    const body=doc.getBody();
+    body.appendParagraph(candidate.EMPLOYEES_NAME||'Candidate').setHeading(DocumentApp.ParagraphHeading.TITLE);
+    body.appendParagraph(`Role Applied: ${candidate.ROLE||'Not specified'}`);
+    body.appendParagraph(`Mobile: ${candidate.MOBILE||''} | Email: ${candidate.EMPLOYEE_EMAIL_ID||''} | City: ${candidate.CITY||''}`);
+    body.appendParagraph('Professional Summary').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph(`Experience: ${candidate.EXPERIENCE_YEARS||'Not provided'} years\nCurrent Company: ${candidate.CURRENT_COMPANY||'Not provided'}\nCurrent CTC: ${candidate.CURRENT_CTC||'Not provided'}\nExpected CTC: ${candidate.EXPECTED_CTC||'Not provided'}\nNotice Period: ${candidate.NOTICE_PERIOD||'Not provided'}`);
+    body.appendParagraph('Skills & Education').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph(`Skills: ${candidate.SKILLS||'Not provided'}\nEducation: ${candidate.EDUCATION||'Not provided'}`);
+    body.appendParagraph('Interview Notes').setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    body.appendParagraph(candidate.REMARKS||'Pending interviewer notes.');
+    doc.saveAndClose();
+    const file=DriveApp.getFileById(doc.getId()),folderId=PropertiesService.getScriptProperties().getProperty('ONBOARDING_DRIVE_FOLDER_ID')||'';
+    if(folderId){try{file.moveTo(DriveApp.getFolderById(folderId));}catch(_){}}
+    return file.getUrl();
+  }catch(e){LOG_ERR_('CREATE_CANDIDATE_RESUME',candidate.CANDIDATE_ID,e.message);return '';}
+}
+
+function P1_NEW_STAFF_ENTRY_(p){
+  const c=P1_CANDIDATE_OBJ_(p);
+  if(!c.EMPLOYEES_NAME||!c.MOBILE||!c.EMPLOYEE_EMAIL_ID)return{ok:false,err:'Name, mobile and registered email required'};
+  if(c.TC_ACCEPTED!=='YES')return{ok:false,err:'Terms & Conditions acceptance required'};
+  if(c.PRIVACY_CONSENT!=='YES')return{ok:false,err:'Candidate privacy consent required'};
+  c.RESUME_LINK=CREATE_CANDIDATE_RESUME_(c);
+  const sh=GET_OR_CREATE_('HR_MD_APPROVAL');
+  UPSERT_MERGE_BY_KEY_(sh,'CANDIDATE_ID',c,P1_TAB_MAP.HR_MD_APPROVAL());
+  DC_SEND_TG_(`🧑‍💼 *NEW STAFF ENTRY*\n${c.EMPLOYEES_NAME}|${c.ROLE||'Role pending'}|${c.MOBILE}\n→ HR/MD approval pending. EMP_CODE will be assigned only by HR.`);
+  return{ok:true,candidateId:c.CANDIDATE_ID,status:'PENDING_HR_APPROVAL',leadId:c.CANDIDATE_ID};
+}
+
+function P1_INTERVIEW_ENTRY_(p){
+  const c=P1_CANDIDATE_OBJ_(p);c.ENTRY_TYPE='INTERVIEW_ENTRY';
+  if(!c.EMPLOYEES_NAME||!c.MOBILE||!c.EMPLOYEE_EMAIL_ID)return{ok:false,err:'Candidate name, mobile and email required'};
+  if(c.PRIVACY_CONSENT!=='YES')return{ok:false,err:'Candidate privacy consent required'};
+  c.RESUME_LINK=CREATE_CANDIDATE_RESUME_(c);
+  const sh=GET_OR_CREATE_('INTERVIEW_LOG');
+  UPSERT_MERGE_BY_KEY_(sh,'CANDIDATE_ID',{TIMESTAMP:c.TIMESTAMP,CANDIDATE_ID:c.CANDIDATE_ID,CANDIDATE_NAME:c.EMPLOYEES_NAME,EMAIL:c.EMPLOYEE_EMAIL_ID,MOBILE:c.MOBILE,CITY:c.CITY,ROLE_APPLIED:c.DESIGNATION,DESIGNATION:c.DESIGNATION,EXPERIENCE_YEARS:c.EXPERIENCE_YEARS,CURRENT_COMPANY:c.CURRENT_COMPANY,CURRENT_CTC:c.CURRENT_CTC,EXPECTED_CTC:c.EXPECTED_CTC,NOTICE_PERIOD:c.NOTICE_PERIOD,SKILLS:c.SKILLS,EDUCATION:c.EDUCATION,INTERVIEWER_EMAIL:c.INTERVIEWER_EMAIL,INTERVIEW_STATUS:c.INTERVIEW_STATUS,RESUME_LINK:c.RESUME_LINK,PRIVACY_CONSENT:c.PRIVACY_CONSENT,CONSENT_VERSION:c.CONSENT_VERSION,CONSENT_AT:c.CONSENT_AT,PRIVACY_NOTICE_URL:c.PRIVACY_NOTICE_URL,REMARKS:c.REMARKS},P1_TAB_MAP.INTERVIEW_LOG());
+  DC_SEND_TG_(`🎙 *INTERVIEW ENTRY*\n${c.EMPLOYEES_NAME}|${c.ROLE||'Role pending'}|${c.MOBILE}\nResume: ${c.RESUME_LINK||'creation pending'}`);
+  return{ok:true,candidateId:c.CANDIDATE_ID,status:'INTERVIEW_RECORDED',leadId:c.CANDIDATE_ID,resumeLink:c.RESUME_LINK};
+}
 
 function DC_PROCESS_LEAD_(lead) {
   const lock = LockService.getScriptLock();
@@ -765,17 +1143,25 @@ function DC_PROCESS_LEAD_(lead) {
     if (emp){ lead.EMP_CODE=emp.EMP_CODE; lead.SALES_NAME=lead.SALES_NAME||emp.NAME; lead.MANAGER_EMAIL=lead.MANAGER_EMAIL||emp.MANAGER_EMAIL||DC_CFG.COMPANY.SUPPORT_EMAIL; lead.EMPLOYEE_EMAIL=emp.EMAIL; }
 
     // Stage 3: TAT
-    const tat=COMPUTE_TAT_(lead.LOAN_TYPE);
+    const tat=COMPUTE_TAT_(lead.LOAN_TYPE,lead.PREFERRED_BANK);
     lead.TAT_DAYS=tat.TAT_DAYS; lead.TAT_DEADLINE=tat.TAT_DEADLINE; lead.TAT_STATUS=tat.TAT_STATUS;
 
     // Stage 4: AI credit analysis
     let aiAdvice='';
     try {
-      const aiPrompt='[LEAD]\n'+JSON.stringify({name:lead.CLIENT_NAME,mobile:lead.CLIENT_MOBILE,loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,emp:lead.EMP_CODE,remarks:lead.REMARKS},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
+      const aiPrompt='[REDACTED CREDIT FACTS]\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,documentStatus:lead.DOC_STATUS,emp:lead.EMP_CODE},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
       const aiSys=BULBHUL_SYS_BASE_+'\n\nTask: Credit analysis. 4 sections:\n#### CIBIL Requirements:\n#### Matching Banks:\n#### Red Flags:\n#### Next Steps:';
-      aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys);
+      const aiDigest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,aiPrompt+'||'+aiSys,Utilities.Charset.UTF_8);
+      const aiCacheKey='DC_LEAD_AI_V1_'+P1_B64URL_(aiDigest).slice(0,40);
+      const cachedAdvice=SC_.get(aiCacheKey);
+      if(cachedAdvice){
+        aiAdvice=String(cachedAdvice);
+      }else{
+        aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys,500);
+        SC_.put(aiCacheKey,String(aiAdvice||'').slice(0,2000),6*60*60);
+      }
       lead.AI_ADVICE=aiAdvice;
-    } catch(ae){ aiAdvice='Bulbhul advice unavailable.'; lead.AI_ADVICE=aiAdvice; }
+    } catch(ae){ aiAdvice='AI analysis unavailable.'; lead.AI_ADVICE=aiAdvice; }
 
     const now = new Date();
     lead.TIMESTAMP    = lead.TIMESTAMP || now;
@@ -793,7 +1179,7 @@ function DC_PROCESS_LEAD_(lead) {
     const masterSh =GET_OR_CREATE_('MASTER_DATA');
     const masterH  =P1_ENSURE_HEADERS_(masterSh,P1_TAB_MAP.MASTER_DATA());
     const rowNum   =UPSERT_BY_KEY_(masterSh,'LEAD_ID',lead,P1_TAB_MAP.MASTER_DATA());
-    APPLY_TAT_COLOUR_(masterSh,rowNum,lead.CASE_CATEGORY||lead.CASE_STATUS||'OPEN');
+    APPLY_TAT_COLOUR_(masterSh,rowNum,lead.CASE_CATEGORY||'OPEN');
 
     // Stage 6: MIS_LOG
     const misSh=GET_OR_CREATE_('MIS_LOG');
@@ -889,262 +1275,73 @@ function APPLY_TAT_COLOUR_(sh,row,cs) {
    SECTION 13 — NOTIFICATION TEMPLATES
    ================================================================ */
 
-function GET_MALLIK_CONFIG_() {
+function SEND_SMART_MAIL_(lead,aiAdvice,emp) {
   try {
-    const raw = PropertiesService.getScriptProperties().getProperty('MALLIK_API_KEY') || '';
-    if (!raw) return null;
-
-    // Support both plain key and JSON config
-    if (raw.trim().startsWith('{')) {
-      return JSON.parse(raw);
-    }
-
-    // Fallback: treat as MSG91 authkey only
-    return {
-      msg91_authkey: raw.trim(),
-      msg91_sender: 'DIVCAP',
-      msg91_route: '4',
-      msg91_country: '91'
-    };
-  } catch (e) {
-    return null;
-  }
-}
-
-function SEND_SMART_MAIL_(lead, aiAdvice, emp) {
-  try {
-    lead = lead || {};
-    if (!emp && lead.EMP_CODE) emp = FIND_EMPLOYEE_FULL_(lead.EMP_CODE);
-
-    // Safe Amount
-    let amountDisplay = 'Not Specified';
-    const rawAmt = lead.REQUIRED_LOAN_AMOUNT || lead.AMOUNT || '';
-    if (rawAmt !== '' && rawAmt != null) {
-      const num = Number(String(rawAmt).replace(/[^0-9.]/g, ''));
-      if (!isNaN(num) && num > 0) amountDisplay = '₹ ' + num.toLocaleString('en-IN');
-    }
-
-    const bank = lead.PREFERRED_BANK || lead.BANK || 'Will Auto Update';
-    const tatDays = Number(lead.TAT_DAYS) || (typeof GET_TAT_BY_PRODUCT_ === 'function' ? GET_TAT_BY_PRODUCT_(lead.LOAN_TYPE) : 7);
-    const deadline = lead.TAT_DEADLINE ? new Date(lead.TAT_DEADLINE) : new Date(Date.now() + tatDays * 86400000);
-    const fmtDeadline = Utilities.formatDate(deadline, 'Asia/Kolkata', 'dd MMM yyyy, hh:mm a');
-    const ownerName = emp ? emp.NAME : 'Unassigned';
-    const ownerCode = lead.EMP_CODE || '—';
-    const aiText = String(aiAdvice || lead.AI_ADVICE || 'Immediate follow-up recommended.');
-
-    // ── 1. EMAIL ──
-    if (MailApp.getRemainingDailyQuota() > 0) {
-      let aiHtml = aiText
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/#### (.*?)(\n|$)/g, '<h4 style="color:#0d2260;margin:14px 0 6px;font-size:13px;border-bottom:1px solid #dce6f7;padding-bottom:3px;">$1</h4>')
-        .replace(/^- (.*?)(\n|$)/gm, '<li style="margin-bottom:5px;line-height:1.55;">$1</li>')
-        .replace(/\n/g, '<br>');
-
-      const subject = `[NEW LEAD] ${lead.LEAD_ID || ''} — ${lead.CLIENT_NAME || ''} | ${lead.LOAN_TYPE || 'Loan'} | ${ownerCode}`;
-
-      const htmlBody = `<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#eef1f5;padding:20px}
-.wrap{max-width:620px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.10);border:1px solid #dde1e8}
-.header{background:#0d2260;padding:26px 24px;text-align:center}
-.header h1{color:#f5a623;font-size:22px;font-weight:900;letter-spacing:1.5px;margin-bottom:4px}
-.header p{color:rgba(255,255,255,.85);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px}
-.banner{background:#d4af37;padding:12px 20px;text-align:center;color:#06112c;font-weight:900;font-size:14px;letter-spacing:1.2px;text-transform:uppercase}
-.content{padding:26px 24px}.greeting{font-size:15px;color:#222;line-height:1.6;margin-bottom:20px}
-table{width:100%;border-collapse:collapse;margin-bottom:22px;font-size:13px}
-td{padding:9px 10px;border-bottom:1px solid #f0f2f5;vertical-align:top}
-td.label{font-weight:700;color:#5a6a8a;width:32%;text-transform:uppercase;font-size:11px;letter-spacing:.4px}
-td.value{color:#111;font-weight:500}
-.ai-box{background:#f7f9fc;border-left:4px solid #0d2260;border:1px solid #e0e6f0;border-radius:6px;padding:18px 20px}
-.ai-title{font-size:12px;font-weight:900;color:#0d2260;text-transform:uppercase;border-bottom:2px solid #0d2260;padding-bottom:5px;margin-bottom:12px;display:inline-block}
-.footer{background:#0d2260;text-align:center;padding:13px;font-size:11px;color:rgba(255,255,255,.75)}
-</style></head><body>
-<div class="wrap">
-<div class="header"><h1>DIVYANSHI CAPITAL</h1><p>Bulbhul AI — Lead Notification</p></div>
-<div class="banner">⚡⚡⚡⚡ NEW LEAD ASSIGNED</div>
-<div class="content">
-<p class="greeting">Hello <strong>${ownerName}</strong>, ek naya lead assign hua hai. Immediately follow up karo.</p>
+    if(MailApp.getRemainingDailyQuota()<=0)return false;
+    lead=lead||{}; aiAdvice=aiAdvice||lead.AI_ADVICE||'AI analysis unavailable.';
+    if(!emp&&lead.EMP_CODE)emp=FIND_EMPLOYEE_FULL_(lead.EMP_CODE);
+    const tatDays=Number(lead.TAT_DAYS)||GET_TAT_BY_PRODUCT_(lead.LOAN_TYPE);
+    const dl=lead.TAT_DEADLINE?new Date(lead.TAT_DEADLINE):new Date(Date.now()+tatDays*86400000);
+    const fmtDL=Utilities.formatDate(dl,'Asia/Kolkata','dd MMM yyyy, hh:mm a');
+    const subject=`[NEW LEAD] ${lead.LEAD_ID||''} — ${lead.CLIENT_NAME||''} | ${lead.LOAN_TYPE||'Loan'} | ${lead.EMP_CODE||'Unassigned'}`;
+    const aiHtml=String(aiAdvice)
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/#### (.*?)(\n|$)/g,'<h4 style="color:#0d2260;margin:12px 0 4px;border-bottom:1px solid #dce6f7;padding-bottom:3px;font-size:13px;">$1</h4>')
+      .replace(/^- (.*?)(\n|$)/gm,'<li style="margin-bottom:5px;line-height:1.5">$1</li>')
+      .replace(/\n/g,'<br>');
+    const htmlBody=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#eef1f5;padding:20px}.w{max-width:620px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,.10);border:1px solid #dde1e8}.h{background:#0d2260;padding:28px 24px;text-align:center}.h h1{color:#f5a623;font-size:24px;font-weight:900;letter-spacing:2px;margin-bottom:4px}.h p{color:rgba(255,255,255,.85);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:2px}.b{background:#d4af37;padding:13px 20px;text-align:center;color:#06112c;font-weight:900;font-size:14px;letter-spacing:1.5px;text-transform:uppercase}.c{padding:28px 24px}.g{font-size:15px;color:#222;line-height:1.6;margin-bottom:20px}table{width:100%;border-collapse:collapse;margin-bottom:24px;font-size:13px}td{padding:10px 12px;border-bottom:1px solid #f0f2f5;line-height:1.4;vertical-align:top}td.l{font-weight:700;color:#5a6a8a;width:32%;text-transform:uppercase;font-size:11px;letter-spacing:.5px}td.v{color:#111}.ai{background:#f7f9fc;border-left:4px solid #0d2260;border:1px solid #e0e6f0;border-radius:6px;padding:20px 22px}.ai-t{font-size:13px;font-weight:900;color:#0d2260;text-transform:uppercase;border-bottom:2px solid #0d2260;padding-bottom:5px;margin-bottom:14px;display:inline-block}.f{background:#0d2260;text-align:center;padding:14px;font-size:11px;color:rgba(255,255,255,.75)}</style></head><body>
+<div class="w">
+<div class="h"><h1>DIVYANSHI CAPITAL</h1><p>Divyanshi Assistant — Lead Notification</p></div>
+<div class="b">⚡⚡⚡⚡⚡ NEW LEAD ASSIGNED</div>
+<div class="c">
+<p class="g">Hello <strong>${emp?emp.NAME:'Team'}</strong>, ek naya lead assign hua hai. Immediately follow up karo.</p>
 <table>
-<tr><td class="label">Lead ID</td><td class="value"><strong>${lead.LEAD_ID || 'N/A'}</strong></td></tr>
-<tr><td class="label">Client</td><td class="value"><strong>${lead.CLIENT_NAME || 'N/A'}</strong></td></tr>
-<tr><td class="label">Mobile</td><td class="value">${lead.CLIENT_MOBILE || 'N/A'}</td></tr>
-<tr><td class="label">Loan Type</td><td class="value">${lead.LOAN_TYPE || 'N/A'}</td></tr>
-<tr><td class="label">Amount</td><td class="value"><strong>${amountDisplay}</strong></td></tr>
-<tr><td class="label">Bank</td><td class="value">${bank}</td></tr>
-<tr><td class="label">TAT</td><td class="value">${tatDays} days</td></tr>
-<tr><td class="label">Deadline</td><td class="value"><strong style="color:#c0392b">${fmtDeadline}</strong></td></tr>
-<tr><td class="label">Data Flow</td><td class="value">${lead.DATA_FLOW || 'SALES'}</td></tr>
-<tr><td class="label">Owner</td><td class="value">${ownerName} (${ownerCode})</td></tr>
-<tr><td class="label">Remarks</td><td class="value" style="color:#555;font-style:italic">${String(lead.REMARKS || 'No remarks.').slice(0,300)}</td></tr>
+<tr><td class="l">Lead ID</td><td class="v"><strong>${lead.LEAD_ID||'N/A'}</strong></td></tr>
+<tr><td class="l">Client</td><td class="v"><strong>${lead.CLIENT_NAME||'N/A'}</strong></td></tr>
+<tr><td class="l">Mobile</td><td class="v">${lead.CLIENT_MOBILE||'N/A'}</td></tr>
+<tr><td class="l">Loan Type</td><td class="v">${lead.LOAN_TYPE||'N/A'}</td></tr>
+<tr><td class="l">Amount</td><td class="v">₹ ${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')||'N/A'}</td></tr>
+<tr><td class="l">Bank</td><td class="v">${lead.PREFERRED_BANK||'Will Auto Update'}</td></tr>
+<tr><td class="l">TAT</td><td class="v">${tatDays} days</td></tr>
+<tr><td class="l">Deadline</td><td class="v"><strong style="color:#c0392b">${fmtDL}</strong></td></tr>
+<tr><td class="l">Data Flow</td><td class="v">${lead.DATA_FLOW||'SALES'}</td></tr>
+<tr><td class="l">Owner</td><td class="v">${emp?emp.NAME:'Unassigned'} (${lead.EMP_CODE||'—'})</td></tr>
+<tr><td class="l">Remarks</td><td class="v" style="color:#555;font-style:italic">${String(lead.REMARKS||'No remarks.').slice(0,300)}</td></tr>
 </table>
-<div class="ai-box"><div class="ai-title">⚡ BULBHUL AI — CREDIT ANALYSIS</div>
-<div style="font-size:13px;line-height:1.7;color:#2c3e50">${aiHtml}</div></div>
-</div>
-<div class="footer">Divyanshi Capital Pvt Ltd — Automated by Bulbhul AI — Do not reply</div>
+<div class="ai"><div class="ai-t">⚡⚡⚡⚡⚡ DIVYANSHI ASSISTANT — CREDIT ANALYSIS</div><div style="font-size:13px;line-height:1.7;color:#2c3e50">${aiHtml}</div></div>
+</div><div class="f">Divyanshi Capital Pvt Ltd — Automated by Divyanshi Assistant — Do not reply</div>
 </div></body></html>`;
-
-      const recipients = new Set();
-      const addEmail = e => { if (e) { const x = String(e).trim().toLowerCase(); if (x) recipients.add(x); } };
-      addEmail(emp ? emp.EMAIL : null);
-      addEmail(lead.MANAGER_EMAIL);
-      addEmail(DC_CFG.COMPANY.FOUNDER_EMAIL);
-      addEmail(DC_CFG.COMPANY.MD_EMAIL);
-
-      const arr = [...recipients];
-      if (arr.length) {
-        GmailApp.sendEmail(arr[0], subject, 'New lead notification', {
-          htmlBody: htmlBody,
-          cc: arr.slice(1).join(',') || '',
-          name: 'Bulbhul — DC AI Engine'
-        });
-      }
-    }
-
-    // ── 2. TELEGRAM ──
-    try {
-      const tgMsg = `🆕 *NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━━━━━━━\n🪪 *Lead ID:* ${lead.LEAD_ID || 'N/A'}\n👤 *Client:* ${lead.CLIENT_NAME || 'N/A'}\n📱 *Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n💳 *Loan:* ${lead.LOAN_TYPE || 'N/A'}\n💰 *Amount:* ${amountDisplay}\n🏦 *Bank:* ${bank}\n⏱ *TAT:* ${tatDays} days\n⚠ *Deadline:* ${fmtDeadline}\n👔 *Owner:* ${ownerName} (${ownerCode})\n📋 *Remarks:* ${String(lead.REMARKS || 'No remarks').slice(0,120)}\n━━━━━━━━━━━━━━━━━━━━\n🤖 *Bulbhul AI:*\n${aiText.slice(0,350)}`;
-      DC_SEND_TG_(tgMsg);
-    } catch (e) { LOG_ERR_('NOTIFY_TG', lead.LEAD_ID || '', e.message); }
-
-    // ── 3. WHATSAPP ──
-    try {
-      if (emp && emp.WHATSAPP && String(emp.WHATSAPP_VERIFIED || '').toUpperCase() === 'YES') {
-        const waMsg = `*NEW LEAD ASSIGNED*\n━━━━━━━━━━━━━━\n*Lead ID:* ${lead.LEAD_ID || 'N/A'}\n*Client:* ${lead.CLIENT_NAME || 'N/A'}\n*Mobile:* ${lead.CLIENT_MOBILE || 'N/A'}\n*Loan:* ${lead.LOAN_TYPE || 'N/A'}\n*Amount:* ${amountDisplay}\n*Bank:* ${bank}\n*TAT:* ${tatDays} days\n*Deadline:* ${fmtDeadline}\n*Owner:* ${ownerName} (${ownerCode})\n━━━━━━━━━━━━━━\n*Bulbhul:* ${aiText.slice(0,200)}`;
-        DC_SEND_WA_(emp.WHATSAPP, waMsg);
-      }
-    } catch (e) { LOG_ERR_('NOTIFY_WA', lead.LEAD_ID || '', e.message); }
-
-    // ── 4. SMS + RCS (Single Key) ──
-    const cfg = GET_MALLIK_CONFIG_();
-    if (cfg && emp && emp.MOBILE) {
-      const phone = String(emp.MOBILE).replace(/\D/g, '').slice(-10);
-
-      // SMS
-      try {
-        DC_SEND_SMS_SINGLE_(phone, `NEW LEAD: ${lead.CLIENT_NAME || 'Client'} | ${lead.LOAN_TYPE || 'Loan'} | ${amountDisplay} | ${bank} | ID:${lead.LEAD_ID || ''} | Owner:${ownerName} - Bulbhul`, cfg);
-      } catch (e) { LOG_ERR_('NOTIFY_SMS', lead.LEAD_ID || '', e.message); }
-
-      // RCS
-      try {
-        DC_SEND_RCS_SINGLE_(phone, {
-          leadId: lead.LEAD_ID || '',
-          client: lead.CLIENT_NAME || '',
-          mobile: lead.CLIENT_MOBILE || '',
-          loanType: lead.LOAN_TYPE || '',
-          amount: amountDisplay,
-          bank: bank,
-          tat: tatDays + ' days',
-          deadline: fmtDeadline,
-          owner: ownerName + ' (' + ownerCode + ')',
-          ai: aiText.slice(0, 180)
-        }, cfg);
-      } catch (e) { LOG_ERR_('NOTIFY_RCS', lead.LEAD_ID || '', e.message); }
-    }
-
+    const sent=new Set();
+    const addR=e=>{if(e){const el=String(e).trim().toLowerCase();if(el&&!sent.has(el))sent.add(el);}};
+    addR(emp?emp.EMAIL:null); addR(lead.MANAGER_EMAIL); addR(DC_CFG.COMPANY.FOUNDER_EMAIL); addR(DC_CFG.COMPANY.MD_EMAIL);
+    const arr=[...sent]; if(!arr[0])return false;
+    GmailApp.sendEmail(arr[0],subject,'',{htmlBody,cc:arr.slice(1).join(',')||'',name:'Divyanshi Assistant'});
     return true;
-  } catch (e) {
-    LOG_ERR_('SEND_SMART_MAIL', (lead && lead.LEAD_ID) || '', e.message);
-    return false;
-  }
+  } catch(e){ LOG_ERR_('SEND_SMART_MAIL',(lead&&lead.LEAD_ID)||'',e.message); return false; }
 }
 
-function DC_SEND_SMS_SINGLE_(mobile, message, cfg) {
-  try {
-    if (!cfg || !cfg.msg91_authkey) return false;
-    let phone = String(mobile || '').replace(/\D/g, '');
-    if (phone.length === 10) phone = (cfg.msg91_country || '91') + phone;
-
-    const url = 'https://control.msg91.com/api/sendhttp.php'
-      + '?authkey=' + encodeURIComponent(cfg.msg91_authkey)
-      + '&mobiles=' + encodeURIComponent(phone)
-      + '&message=' + encodeURIComponent(String(message).slice(0, 300))
-      + '&sender=' + encodeURIComponent(cfg.msg91_sender || 'DIVCAP')
-      + '&route=' + encodeURIComponent(cfg.msg91_route || '4')
-      + '&country=' + encodeURIComponent(cfg.msg91_country || '91');
-
-    const res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
-    return res.getResponseCode() === 200;
-  } catch (e) {
-    return false;
-  }
-}
-
-function DC_SEND_RCS_SINGLE_(mobile, data, cfg) {
-  try {
-    if (!cfg || !cfg.msg91_authkey) return false;
-    let phone = String(mobile || '').replace(/\D/g, '');
-    if (phone.length === 10) phone = '91' + phone;
-
-    const payload = {
-      recipients: [{ mobiles: phone }],
-      message: {
-        type: 'text',
-        text: `🆕 NEW LEAD\nLead: ${data.leadId}\nClient: ${data.client}\nLoan: ${data.loanType}\nAmount: ${data.amount}\nBank: ${data.bank}\nOwner: ${data.owner}\n\n${data.ai}`
-      }
-    };
-
-    const res = UrlFetchApp.fetch('https://api.msg91.com/api/v5/rcs/', {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { authkey: cfg.msg91_authkey },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    return res.getResponseCode() >= 200 && res.getResponseCode() < 300;
-  } catch (e) {
-    return false;
-  }
-}
-function SEND_TG_LEAD_ALERT_(lead, emp) {
-  try {
-    lead = lead || {};
-    const name = emp ? emp.NAME : (lead.SALES_NAME || 'Unassigned');
-    const code = lead.EMP_CODE || '—';
-    const amt  = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
-    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
-    const msg =
-      `🆕 *NEW LEAD*\n` +
-      `📋 ID: ${lead.LEAD_ID || 'N/A'}\n` +
-      `👤 ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
-      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
-      `🏦 ${lead.PREFERRED_BANK || 'N/A'} | ⏱ TAT: ${lead.TAT_DAYS || 7}d\n` +
-      `👔 Owner: ${name} (${code})\n` +
-      `📌 ${String(lead.REMARKS || 'No remarks').slice(0, 120)}`;
-    DC_SEND_TG_(msg);
-  } catch (e) { LOG_ERR_('SEND_TG_LEAD_ALERT', (lead && lead.LEAD_ID) || '', e.message); }
+function SEND_TG_LEAD_ALERT_(lead,emp) {
+  const tatDays=Number(lead.TAT_DAYS)||GET_TAT_BY_PRODUCT_(lead.LOAN_TYPE);
+  const dl=lead.TAT_DEADLINE?new Date(lead.TAT_DEADLINE):new Date(Date.now()+tatDays*86400000);
+  const aiShort=String(lead.AI_ADVICE||'').split('\n').slice(0,6).join('\n').slice(0,400);
+  DC_SEND_TG_(
+    `🆕 *NEW LEAD — ${lead.DATA_FLOW||'SALES'}*\n━━━━━━━━━━━━━━━━━\n`+
+    `🪪 *Lead ID:* ${lead.LEAD_ID||'N/A'}\n👤 *Client:* ${lead.CLIENT_NAME||'N/A'}\n📱 *Mobile:* ${lead.CLIENT_MOBILE||'N/A'}\n`+
+    `💳 *Loan:* ${lead.LOAN_TYPE||'N/A'} | ₹${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')}\n🏦 *Bank:* ${lead.PREFERRED_BANK||'TBD'}\n`+
+    `⏱ *TAT:* ${tatDays}d | ⚠ ${Utilities.formatDate(dl,'Asia/Kolkata','dd MMM yyyy')}\n👔 *Owner:* ${emp?emp.NAME:'Unassigned'} (${lead.EMP_CODE||'—'})\n`+
+    `📋 *Remarks:* ${String(lead.REMARKS||'N/A').slice(0,100)}\n━━━━━━━━━━━━━━━━━\n🤖 *Divyanshi Assistant:*\n${aiShort}`
+  );
 }
 
 function NOTIFY_ACCOUNTS_ON_DISBURSE_(lead) {
   try {
-    lead = lead || {};
-    const amt = Number(lead.REQUIRED_LOAN_AMOUNT || 0);
-    const amtStr = amt ? '₹' + amt.toLocaleString('en-IN') : 'N/A';
-    const msg =
-      `✅ *DISBURSAL COMPLETE*\n` +
-      `📋 Lead: ${lead.LEAD_ID || 'N/A'}\n` +
-      `👤 Client: ${lead.CLIENT_NAME || 'N/A'} | 📱 ${lead.CLIENT_MOBILE || 'N/A'}\n` +
-      `💳 ${lead.LOAN_TYPE || 'N/A'} | 💰 ${amtStr}\n` +
-      `🏦 Bank: ${lead.PREFERRED_BANK || 'N/A'}\n` +
-      `👔 Owner: ${lead.SALES_NAME || 'N/A'} (${lead.EMP_CODE || '—'})`;
-
-    // Log to ACCOUNTS_LOG sheet
-    const sh = GET_OR_CREATE_('ACCOUNTS_LOG');
-    P1_ENSURE_HEADERS_(sh, P1_TAB_MAP.ACCOUNTS_LOG());
-    sh.appendRow(P1_BUILD_ROW_(sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_), lead));
-
-    // Notify via TG
-    const tgToken = DC_CFG.TG_TOKEN;
-    const acctId = PropertiesService.getScriptProperties().getProperty('ACCOUNTS_TG_CHAT_ID') || '';
-    if (tgToken && acctId) DC_SEND_TG_MESSAGE_(acctId, msg);
-    else DC_SEND_TG_(msg);
-
-    // Notify accounts email
-    if (MailApp.getRemainingDailyQuota() > 0) {
-      MailApp.sendEmail(DC_CFG.COMPANY.ACCOUNTS_EMAIL, `[DISBURSAL] ${lead.LEAD_ID || ''} — ${lead.CLIENT_NAME || ''}`,
-        `Disbursal logged.\n\nLead: ${lead.LEAD_ID}\nClient: ${lead.CLIENT_NAME} | ${lead.CLIENT_MOBILE}\nLoan: ${lead.LOAN_TYPE} | ${amtStr}\nBank: ${lead.PREFERRED_BANK}\nOwner: ${lead.SALES_NAME} (${lead.EMP_CODE})\n\n— Bulbhul AI`);
-    }
-  } catch (e) { LOG_ERR_('NOTIFY_ACCOUNTS_ON_DISBURSE', (lead && lead.LEAD_ID) || '', e.message); }
+    const sh=GET_OR_CREATE_('ACCOUNTS_LOG');
+    sh.appendRow(P1_BUILD_ROW_(P1_ENSURE_HEADERS_(sh,P1_TAB_MAP.ACCOUNTS_LOG()),{TIMESTAMP:new Date(),LEAD_ID:lead.LEAD_ID||'',CLIENT_NAME:lead.CLIENT_NAME||'',CLIENT_MOBILE:lead.CLIENT_MOBILE||'',LOAN_TYPE:lead.LOAN_TYPE||'',REQUIRED_LOAN_AMOUNT:lead.REQUIRED_LOAN_AMOUNT||'',PREFERRED_BANK:lead.PREFERRED_BANK||'',SALES_NAME:lead.SALES_NAME||'',EMP_CODE:lead.EMP_CODE||'',DISBURSAL_STATUS:'PENDING_PROCESSING',REMARKS:lead.REMARKS||''}));
+    if(MailApp.getRemainingDailyQuota()>0)
+      MailApp.sendEmail({to:DC_CFG.COMPANY.ACCOUNTS_EMAIL,cc:DC_CFG.COMPANY.MD_EMAIL+','+DC_CFG.COMPANY.FOUNDER_EMAIL,subject:`[DISBURSAL] ${lead.LEAD_ID||''} — ${lead.CLIENT_NAME||''} | ${lead.PREFERRED_BANK||''}`,body:`Disbursed. Process PF/PDD.\n\nLead:${lead.LEAD_ID}\nClient:${lead.CLIENT_NAME}|${lead.CLIENT_MOBILE}\nLoan:${lead.LOAN_TYPE}|₹${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')}\nBank:${lead.PREFERRED_BANK}\nOwner:${lead.SALES_NAME}(${lead.EMP_CODE})\n\n— Divyanshi Assistant`,name:DC_CFG.COMPANY.NAME});
+    DC_SEND_TG_(`💰 *DISBURSAL*\n${lead.LEAD_ID||''}|${lead.CLIENT_NAME||''}|${lead.PREFERRED_BANK||''}|₹${Number(lead.REQUIRED_LOAN_AMOUNT||0).toLocaleString('en-IN')}\nOwner:${lead.SALES_NAME||''}(${lead.EMP_CODE||''})\n→Accounts notified.`);
+  } catch(e){ LOG_ERR_('NOTIFY_ACCOUNTS_DISBURSE',lead.LEAD_ID||'',e.message); }
 }
 
 /* ================================================================
@@ -1305,17 +1502,11 @@ function PARSE_MIS_MAIL_BODY_(subject,body) {
 function P1_TG_HANDLE_(body) {
   const msg=body.message; if(!msg||!msg.chat)return'OK';
   const chatId=msg.chat.id,text=String(msg.text||'').trim(); if(!text)return'OK';
-  if(text==='/start'||text==='/help'){DC_SEND_TG_MESSAGE_(chatId,'Namaste! 🙏 Bulbhul V2 active hai.\n\n/core MD|FOUNDER|ACCOUNTS|HR — Register\n/checkin1 or /checkin2 — Manager attendance\n\nOr type karo, I\'ll help!');return'OK';}
-  if(/^\/core\s+/i.test(text)){
-    const role=text.replace(/^\/core\s+/i,'').trim().toUpperCase();
-    const map={FOUNDER:'FOUNDER_TG_CHAT_ID',MD:'MD_TG_CHAT_ID',ACCOUNTS:'ACCOUNTS_TG_CHAT_ID',HR:'HR_TG_CHAT_ID'};
-    if(!map[role]){DC_SEND_TG_MESSAGE_(chatId,'Use: /core MD|FOUNDER|ACCOUNTS|HR');return'OK';}
-    PropertiesService.getScriptProperties().setProperty(map[role],String(chatId));
-    DC_SEND_TG_MESSAGE_(chatId,'✅ Registered as '+role);return'OK';
-  }
+  if(text==='/start'||text==='/help'){DC_SEND_TG_MESSAGE_(chatId,'Namaste! 🙏 Divyanshi Assistant active hai.\n\nThis chat works only after the administrator maps this chat ID to an employee.\n/checkin1 or /checkin2 — manager attendance\n\nOr type karo, I\'ll help!');return'OK';}
+  if(/^\/core\s+/i.test(text)){DC_SEND_TG_MESSAGE_(chatId,'Chat mapping is administrator-controlled. Contact the MD/technical owner.');return'OK';}
   try {
-    const isMD=DC_GET_CORE_TG_IDS_().includes(String(chatId));
-    const reply=BULBHUL_CHAT_API_({message:text,empCode:isMD?'DC002':'',source:'TELEGRAM'});
+    const empCode=P1_TG_EMP_CODE_(chatId);if(!empCode){DC_SEND_TG_MESSAGE_(chatId,'This Telegram chat is not mapped to an active employee.');return'OK';}
+    const reply=BULBHUL_CHAT_API_({message:text,empCode,source:'TELEGRAM'});
     DC_SEND_TG_MESSAGE_(chatId,String(reply||'Ji, bataiye?').slice(0,4000));
   } catch(e){ LOG_ERR_('TG_AI',chatId,e.message); }
   return'OK';
@@ -1323,18 +1514,22 @@ function P1_TG_HANDLE_(body) {
 
 function P1_TG_DUPLICATE_(updateId) {
   if(!updateId)return false;
+  const lock=LockService.getScriptLock();if(!lock.tryLock(3000))return true;
+  try{
   const p=PropertiesService.getScriptProperties();
   const last=Number(p.getProperty('P1_TG_LAST_UPDATE_ID')||0),now=Number(updateId);
   if(now<=last)return true;
   p.setProperty('P1_TG_LAST_UPDATE_ID',String(now));
   return false;
+  }finally{lock.releaseLock();}
 }
 
 function P1_SET_TG_WEBHOOK_() {
+  const props=PropertiesService.getScriptProperties(),secret=String(props.getProperty('TG_WEBHOOK_SECRET')||'').trim()||Utilities.getUuid().replace(/-/g,'');if(!props.getProperty('TG_WEBHOOK_SECRET'))props.setProperty('TG_WEBHOOK_SECRET',secret);
   const token=DC_CFG.TG_TOKEN,url=P1_GET_EXEC_URL_(); if(!token||!url){Logger.log('⚠ TG_TOKEN or exec URL missing');return;}
   UrlFetchApp.fetch('https://api.telegram.org/bot'+token+'/deleteWebhook',{method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({drop_pending_updates:true})});
   Utilities.sleep(1000);
-  Logger.log(UrlFetchApp.fetch('https://api.telegram.org/bot'+token+'/setWebhook',{method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({url,allowed_updates:['message'],drop_pending_updates:true})}).getContentText());
+  Logger.log(UrlFetchApp.fetch('https://api.telegram.org/bot'+token+'/setWebhook',{method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({url:url+'?tg_secret='+encodeURIComponent(secret),allowed_updates:['message'],drop_pending_updates:true})}).getContentText());
 }
 
 /* ================================================================
@@ -1359,45 +1554,51 @@ function P1_GET_STAFF_DASHBOARD_DATA_(empCode) {
   try {
     empCode=String(empCode||'').trim().toUpperCase();
     const emp=empCode?FIND_EMPLOYEE_FULL_(empCode):null;
+    if(!emp)return{ok:false,err:'Valid active employee required',stats:{total:0,approved:0,review:0,volume:0},cases:[]};
     const access=emp?String(emp.DASHBOARD_ACCESS||emp.ROLE||'STAFF').toUpperCase():'STAFF';
     let data=GET_MASTER_SNAPSHOT_();
-    if(!['MD','FOUNDER','ADMIN','MANAGING DIRECTOR'].some(r=>access.includes(r))&&!['MANAGER','HR','ACCOUNTS'].some(r=>access.includes(r)))
-      data=data.filter(r=>String(r.EMP_CODE||'').toUpperCase()===empCode);
+    if(!P1_HAS_MASTER_ACCESS_(emp))data=data.filter(r=>{
+      const ownerCode=String(r.EMP_CODE||'').toUpperCase();if(ownerCode===empCode)return true;
+      const owner=FIND_EMPLOYEE_FULL_(ownerCode);return owner?P1_CAN_SEE_EMP_(emp,owner):false;
+    });
     const sOf=r=>String(r.CASE_CATEGORY||'OPEN').toUpperCase();
     const stats={total:data.length,approved:data.filter(r=>['APPROVED','DISBURSED','DISBURSE'].includes(sOf(r))).length,review:data.filter(r=>['OPEN','INTERESTED','CALLBACK'].includes(sOf(r))).length,volume:data.reduce((s,r)=>s+Number(r.REQUIRED_LOAN_AMOUNT||0),0)};
     const cases=data.slice(0,150).map(r=>({leadId:r.LEAD_ID||'',clientName:r.CLIENT_NAME||'',mobile:r.CLIENT_MOBILE||'',loanType:r.LOAN_TYPE||'',amount:r.REQUIRED_LOAN_AMOUNT||'',bank:r.PREFERRED_BANK||'',status:sOf(r),tatStatus:r.TAT_STATUS||'ACTIVE',empCode:r.EMP_CODE||''}));
-    return{ok:true,staff:{NAME:emp?emp.NAME:'Team',DESIGNATION:emp?(emp.ROLE||''):'',DEPARTMENT:emp?(emp.DEPARTMENT||''):''},access,stats,cases,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_()};
+    return{ok:true,staff:{NAME:emp.NAME,ROLE:emp.ROLE||'',DESIGNATION:emp.DESIGNATION||emp.ROLE||'',DEPARTMENT:emp.DEPARTMENT||''},access,stats,cases,control:P1_GET_MASTER_CONTROL_(empCode),products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_()};
   } catch(e){ LOG_ERR_('P1_GET_STAFF_DASHBOARD_DATA',empCode,e.message); return{ok:false,err:e.message,stats:{total:0,approved:0,review:0,volume:0},cases:[]}; }
 }
 
 function P1_GET_STAFF_PUBLIC_DATA_(empCode) {
   try {
     empCode=String(empCode||'').trim().toUpperCase();
-    const emp=empCode?FIND_EMPLOYEE_FULL_(empCode):null; if(!emp)return null;
+    const emp=empCode?FIND_EMPLOYEE_FULL_(empCode):null;if(!emp)return null;
     const base=P1_GET_EXEC_URL_(),e=encodeURIComponent(empCode);
+    const designation=String(emp.DESIGNATION||emp.ROLE||'Financial Consultant').trim();
+    const department=String(emp.DEPARTMENT||'').trim();
     const avatar=emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(emp.NAME||empCode)}&background=d4af37&color=0a2540&size=160`;
-    const at=encodeURIComponent(P1_MINT_ACCESS_TOKEN_(empCode));
-    return{ok:true,empCode,name:emp.NAME,role:emp.ROLE||'RM',dept:emp.DEPARTMENT||'',mobile:emp.MOBILE||'',whatsapp:emp.WHATSAPP||emp.MOBILE||'',tgChatId:emp.TG_CHAT_ID||'',email:emp.EMAIL||'',profilePic:avatar,formLink:`${base}?page=form&emp=${e}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}&access_token=${at}`,voiceLink:`${base}?page=voice&emp=${e}&access_token=${at}`};
+    const routeEmail=DC_CLEAN_EMAIL_(emp.EMAIL||''),routeSig=routeEmail?P1_ROUTE_SIGNATURE_(emp.EMP_CODE,routeEmail):'';
+    const route=routeEmail?`&manager_email_id=${encodeURIComponent(routeEmail)}&route_signature=${encodeURIComponent(routeSig)}`:'';
+    return{ok:true,empCode,name:emp.NAME,role:String(emp.ROLE||designation).trim(),designation,dept:department,department,mobile:emp.MOBILE||'',whatsapp:emp.WHATSAPP||emp.MOBILE||'',email:emp.EMAIL||'',address:String(emp.OFFICE_ADDRESS||PropertiesService.getScriptProperties().getProperty('COMPANY_ADDRESS')||'').trim(),profilePic:avatar,formLink:`${base}?page=form&emp=${e}${route}`,dashboardLink:`${base}?page=dashboard&emp=${e}`,cardLink:`${base}?page=card&emp=${e}`,callingLink:`${base}?page=calling&emp=${e}`};
   } catch(e){ LOG_ERR_('P1_GET_STAFF_PUBLIC_DATA',empCode,e.message); return null; }
+}
+
+function P1_TG_EMP_CODE_(chatId){
+  const p=PropertiesService.getScriptProperties(),id=String(chatId||'').trim();
+  const mapped=[['MD_TG_CHAT_ID','MD_TG_EMP_CODE'],['FOUNDER_TG_CHAT_ID','FOUNDER_TG_EMP_CODE'],['ACCOUNTS_TG_CHAT_ID','ACCOUNTS_TG_EMP_CODE'],['HR_TG_CHAT_ID','HR_TG_EMP_CODE']];
+  for(const pair of mapped){if(String(p.getProperty(pair[0])||'').trim()===id){const code=String(p.getProperty(pair[1])||'').trim().toUpperCase();if(code)return code;}}
+  const emp=Object.values(DC_BUILD_EMP_MAP_()).find(e=>String(e.TG_CHAT_ID||'').trim()===id);return emp?emp.EMP_CODE:'';
 }
 
 /* ================================================================
    SECTION 20 — TRIGGERS + ONEDIT
    ================================================================ */
 
-// Lightweight onEdit — heavy ops deferred
-function onEdit(e) {
+// Installable edit handler. A custom name prevents duplicate simple+installable execution.
+function P1_ON_EDIT_INSTALLABLE(e) {
   try {
     if(!e||!e.range)return;
     const sh=e.range.getSheet(),name=sh.getName(),row=e.range.getRow(),col=e.range.getColumn();
     if(row<2)return;
-
-    // ALL_EMPLOYEES: once the core identity fields exist, complete the schema
-    // and create this employee's public links automatically.
-    if(name==='ALL_EMPLOYEES'){
-      try { P1_SYNC_EMPLOYEE_ROW_(sh,row); } catch(e) { LOG_ERR_('onEdit.ALL_EMPLOYEES','',e.message); }
-      return;
-    }
 
     // Auto LAST_UPDATED (lightweight — single cell write)
     try {
@@ -1445,128 +1646,15 @@ function onEdit(e) {
       } catch(_){}
     }
 
-    // ALL_EMPLOYEES: auto-provision P1 links + columns when EMP_CODE + NAME filled
-    if(name==='ALL_EMPLOYEES'){
-      try { P1_AUTO_PROVISION_EMP_ROW_(sh, row); } catch(_){}
-    }
-
     // HR_MD_APPROVAL: flag approved staff
     if(name==='HR_MD_APPROVAL'){
       try {
         const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
-        const iS=h.indexOf('STATUS'),iE=h.indexOf('EMP_CODE'),iO=h.indexOf('ONBOARD_DONE');
-        if(col===iS+1){
-          const st=String(sh.getRange(row,iS+1).getValue()||'').toUpperCase();
-          const ec=String(iE>-1?sh.getRange(row,iE+1).getValue():'').toUpperCase();
-          const od=String(iO>-1?sh.getRange(row,iO+1).getValue():'').toUpperCase();
-          if(st==='APPROVED'&&ec&&od!=='YES'){
-            DC_SEND_TG_(`🟢 Staff APPROVED: ${ec} | ${st}\n→ HR: provision karo.`);
-            if(iO>-1)sh.getRange(row,iO+1).setValue('PENDING_PROVISION');
-          }
-        }
+        const watched=['STATUS','EMP_CODE','SALARY_MONTHLY','JOINING_DATE','ACTIVE_STATUS','MANAGER_EMAIL_ID','ROLE','DESIGNATION'];
+        if(watched.some(k=>col===h.indexOf(k)+1))PROCESS_HR_APPROVAL_ROW_(sh,row);
       } catch(_){}
     }
-  } catch(err){ LOG_ERR_('onEdit','',err.message); }
-}
-
-/* ----------------------------------------------------------------
-   AUTO-PROVISION: called from onEdit when ANY cell in ALL_EMPLOYEES
-   is edited. If EMP_CODE + NAME filled and not yet CONNECTED → runs
-   full column setup for that row only (single-row, <3s).
-   ---------------------------------------------------------------- */
-function P1_AUTO_PROVISION_EMP_ROW_(sh, row) {
-  // Read headers once
-  const lastCol = Math.max(sh.getLastColumn(), 1);
-  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(DC_NORM_);
-
-  const iCode   = headers.indexOf('EMP_CODE');
-  const iName   = headers.indexOf('EMPLOYEES_NAME');
-  const iSync   = headers.indexOf('P1_SYNC_STATUS');
-  if (iCode < 0) return; // sheet not ready yet
-
-  // Read the row
-  const rowVals = sh.getRange(row, 1, 1, lastCol).getValues()[0];
-  const empCode = String(rowVals[iCode] || '').trim().toUpperCase();
-  const empName = String(iName >= 0 ? rowVals[iName] || '' : '').trim();
-
-  // Must have both EMP_CODE and NAME; skip if already CONNECTED
-  if (!empCode || !empName) return;
-  if (iSync >= 0 && String(rowVals[iSync] || '').toUpperCase() === 'CONNECTED') return;
-
-  const base = P1_GET_EXEC_URL_();
-  if (!base) return; // not deployed yet
-  const e    = encodeURIComponent(empCode);
-  const now  = new Date();
-  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(empName)}&background=d4af37&color=0a2540&size=160`;
-
-  // Column definitions: [colName, value_or_formula]
-  // We only write if column exists OR create it
-  const COLS = [
-    ['P1_WEBSITE_URL',     `=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`],
-    ['P1_SMART_FORM_URL',  `=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`],
-    ['P1_DIGITAL_CARD_URL',`=HYPERLINK("${base}?page=card&emp=${e}","🪪 Card")`],
-    ['P1_DASHBOARD_URL',   `=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`],
-    ['P1_CALLING_URL',     `=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`],
-    ['P1_VOICE_URL',       `=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`],
-    ['P1_QR_TEXT',         `${base}?page=card&emp=${e}`],
-    ['P1_AVATAR_URL',      avatar],
-    ['P1_SYNC_STATUS',     'CONNECTED'],
-    ['P1_LAST_SYNC_AT',    now],
-    ['ACTIVE_STATUS',      ''],  // only write if blank
-    ['WHATSAPP_VERIFIED',  ''],  // filled later via WA bot
-    ['TELEGRAM_CHAT_ID',   ''],  // filled later via TG bot
-  ];
-
-  // Build current header state (may grow)
-  const liveHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(DC_NORM_);
-
-  COLS.forEach(([colName, val]) => {
-    const norm = DC_NORM_(colName);
-    let ci = liveHeaders.indexOf(norm);
-    if (ci < 0) {
-      // Create new column header
-      ci = sh.getLastColumn();
-      sh.getRange(1, ci + 1).setValue(colName).setFontWeight('bold').setBackground('#d4af37');
-      liveHeaders.push(norm);
-    }
-    const cell = sh.getRange(row, ci + 1);
-    // For placeholder-only cols (ACTIVE_STATUS, WA, TG): only write if empty
-    const placeholderOnly = ['ACTIVE_STATUS','WHATSAPP_VERIFIED','TELEGRAM_CHAT_ID'].includes(colName);
-    if (placeholderOnly) {
-      if (cell.getValue() === '' || cell.getValue() === null) {
-        if (colName === 'ACTIVE_STATUS') cell.setValue('YES');
-        // WA and TG left blank — bots fill later
-      }
-      return;
-    }
-    if (typeof val === 'string' && val.startsWith('=')) cell.setFormula(val);
-    else cell.setValue(val);
-  });
-
-  // Highlight row green to indicate provisioned
-  try { sh.getRange(row, 1, 1, sh.getLastColumn()).setBackground('#d9ead3'); } catch(_){}
-
-  // Invalidate emp cache so next doGet picks up new employee
-  try { CLEAR_EMP_CACHE_(); } catch(_){}
-
-  // TG admin alert
-  try {
-    const mobile = (() => {
-      const iM = liveHeaders.indexOf('MOBILE');
-      return iM >= 0 ? String(sh.getRange(row, iM + 1).getValue() || '') : '';
-    })();
-    const dept   = (() => {
-      const iD = liveHeaders.indexOf('DEPARTMENT');
-      return iD >= 0 ? String(sh.getRange(row, iD + 1).getValue() || '') : '';
-    })();
-    DC_SEND_TG_(
-      `✅ *NEW EMPLOYEE AUTO-PROVISIONED*\n` +
-      `👤 ${empName} | 🆔 ${empCode}\n` +
-      `🏢 Dept: ${dept || '—'} | 📱 ${mobile || '—'}\n` +
-      `🔗 Card: ${base}?page=card&emp=${e}\n` +
-      `📌 Status: CONNECTED | Telegram & WhatsApp pending bot link`
-    );
-  } catch(_){}
+  } catch(err){ LOG_ERR_('P1_ON_EDIT_INSTALLABLE','',err.message); }
 }
 
 function P1_FORM_SUBMIT(e) {
@@ -1575,85 +1663,109 @@ function P1_FORM_SUBMIT(e) {
     const nv=e.namedValues||{};
     const lead={};
     Object.keys(nv).forEach(k=>{lead[DC_NORM_(k)]=Array.isArray(nv[k])?nv[k][0]:nv[k];});
-    const isStaff=(lead['EMPLOYEES_NAME']||lead['EMP_CODE']||lead['EMPLOYEE_EMAIL'])&&!lead['CLIENT_NAME']&&!lead['CLIENT_MOBILE'];
-    if(isStaff){
-      const hrSh=GET_OR_CREATE_('HR_MD_APPROVAL');
-      hrSh.appendRow(P1_BUILD_ROW_(P1_ENSURE_HEADERS_(hrSh,P1_TAB_MAP.HR_MD_APPROVAL()),Object.assign({TIMESTAMP:new Date(),STATUS:'PENDING',ONBOARD_DONE:'NO'},lead)));
-      DC_SEND_TG_(`📝 *New Staff Form*\n${lead.EMPLOYEES_NAME||''} | ${lead.ROLE||''}\n→ Pending HR/MD Approval`);
-      return;
-    }
-    DC_PROCESS_LEAD_(Object.assign(lead,{SOURCE_TYPE:'GOOGLE_FORM',SOURCE_NAME:lead.SOURCE_NAME||'Google Form'}));
+    const isStaff=(lead['EMPLOYEES_NAME']||lead['EMPLOYEE_EMAIL_ID']||lead['EMPLOYEE_EMAIL'])&&!lead['CLIENT_NAME'];
+    const entryType=String(lead.ENTRY_TYPE||(isStaff?'NEW_STAFF_ENTRY':'SALES_LEAD')).trim().toUpperCase();
+    const payload=Object.assign({},lead,{
+      entry_type:entryType,submission_key:'GF_'+Utilities.getUuid().replace(/-/g,''),source_type:'GOOGLE_FORM',source_name:lead.SOURCE_NAME||'Google Form',
+      client_name:lead.CLIENT_NAME||lead.EMPLOYEES_NAME||lead.CANDIDATE_NAME||'',client_mobile:lead.CLIENT_MOBILE||lead.MOBILE||'',client_email:lead.CLIENT_EMAIL||lead.EMPLOYEE_EMAIL_ID||lead.EMPLOYEE_EMAIL||lead.EMAIL||'',
+      manager_email_id:lead.MANAGER_EMAIL_ID||lead.MANAGER_EMAIL||'',data_consent:lead.DATA_CONSENT,candidate_consent:lead.PRIVACY_CONSENT||lead.CANDIDATE_CONSENT,tc_accepted:lead.TC_ACCEPTED,
+      ai_notice_accepted:lead.AI_NOTICE_ACCEPTED,consent_version:lead.CONSENT_VERSION,consent_at:new Date(),consent_source:'GOOGLE_FORM',privacy_notice_url:lead.PRIVACY_NOTICE_URL
+    });
+    const result=P1_SMART_FORM_SUBMIT_(payload,true);
+    if(!result||!result.ok)LOG_ERR_('P1_FORM_SUBMIT','VALIDATION_REJECTED',result&&result.err?result.err:'Unknown validation error');
+    return result;
   } catch(err){ LOG_ERR_('P1_FORM_SUBMIT','',err.message); }
+}
+
+function PROCESS_HR_APPROVAL_ROW_(sh,row){
+  const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
+  const v=sh.getRange(row,1,1,h.length).getValues()[0],o={};h.forEach((k,i)=>o[k]=v[i]);
+  const status=String(o.STATUS||'').trim().toUpperCase(),empCode=String(o.EMP_CODE||'').trim().toUpperCase();
+  if(!['APPROVED','ACTIVE'].includes(status)||!empCode||String(o.ONBOARD_DONE||'').toUpperCase()==='YES')return;
+  const role=String(o.ROLE||'STAFF').trim(),designation=String(o.DESIGNATION||o.ROLE||role).trim(),roleU=role.toUpperCase();
+  const access=/FOUNDER|MD/.test(roleU)?'ALL':/MANAGER|HEAD/.test(roleU)?'TEAM':'SELF';
+  const emp={BRAND_NAME:'DIVYANSHI CAPITAL',EMP_CODE:empCode,EMPLOYEES_NAME:o.EMPLOYEES_NAME||'',ROLE:role,DESIGNATION:designation,DEPARTMENT:o.DEPARTMENT||'',EMPLOYEE_EMAIL_ID:o.EMPLOYEE_EMAIL_ID||'',MOBILE:o.MOBILE||'',SALARY_MONTHLY:o.SALARY_MONTHLY||'',MANAGER_NAME:o.MANAGER_NAME||'',MANAGER_EMAIL_ID:o.MANAGER_EMAIL_ID||'',HR_APPROVAL:'APPROVED',MD_APPROVAL:'APPROVED',APPROVAL_STATUS:'APPROVED',ACCESS_LEVEL:access,JOINING_DATE:o.JOINING_DATE||new Date(),ACTIVE_STATUS:o.ACTIVE_STATUS&&String(o.ACTIVE_STATUS).toUpperCase()!=='PENDING'?o.ACTIVE_STATUS:'ACTIVE',CREATED_AT:new Date(),UPDATED_AT:new Date(),SYSTEM_KEY:empCode};
+  const empSh=GET_OR_CREATE_('ALL_EMPLOYEES');
+  UPSERT_MERGE_BY_KEY_(empSh,'EMP_CODE',emp,P1_TAB_MAP.ALL_EMPLOYEES());
+  CLEAR_EMP_CACHE_();
+  const provision=fixIndividualStaff_(empCode);
+  CLEAR_EMP_CACHE_();
+  const liveEmp=FIND_EMPLOYEE_FULL_(empCode)||emp;
+  const sent=SEND_EMPLOYEE_JOINING_KIT_(liveEmp,o);
+  const set=(k,val)=>{const i=h.indexOf(k);if(i>-1)sh.getRange(row,i+1).setValue(val);};
+  set('ACTIVE_STATUS','ACTIVE');set('ONBOARD_DONE',sent?'YES':'PROVISIONED');set('JOINING_KIT_SENT_AT',sent?new Date():'');
+  DC_SEND_TG_(`✅ *STAFF ONBOARDED*\n${empCode}|${emp.EMPLOYEES_NAME}|${role}\n${provision}`);
+}
+
+function SEND_EMPLOYEE_JOINING_KIT_(emp,approval){
+  try{
+    const to=DC_CLEAN_EMAIL_(emp.EMAIL||approval.EMPLOYEE_EMAIL_ID||'');if(!to)return false;
+    const props=PropertiesService.getScriptProperties(),base=P1_GET_EXEC_URL_(),e=encodeURIComponent(emp.EMP_CODE||'');
+    const manager=approval.MANAGER_NAME||emp.MANAGER_NAME||'Your reporting manager';
+    const tcUrl=props.getProperty('HR_TC_URL')||'',companyUrl=props.getProperty('COMPANY_WEBSITE_URL')||'https://www.divyanshicapital.com';
+    const links={Website:`${base}?page=home&emp=${e}`,SmartForm:`${base}?page=form&emp=${e}`,DigitalCard:`${base}?page=card&emp=${e}`,Dashboard:`${base}?page=dashboard&emp=${e}`,Calling:`${base}?page=calling&emp=${e}`,PersonalFile:emp.PERSONAL_FILE_ID?`https://docs.google.com/spreadsheets/d/${emp.PERSONAL_FILE_ID}/edit`:''};
+    const linkHtml=Object.keys(links).filter(k=>links[k]).map(k=>`<li><a href="${links[k]}">${k}</a></li>`).join('');
+    const html=`<div style="font-family:Arial;color:#10213b;max-width:700px"><h1 style="color:#0a2540">Welcome to Divyanshi Capital</h1><p>Dear <b>${emp.NAME||approval.EMPLOYEES_NAME||''}</b>,</p><p>Your onboarding is approved. Employee code: <b>${emp.EMP_CODE}</b>.</p><h3>Your role</h3><p><b>${emp.ROLE||''}</b> — ${emp.DEPARTMENT||''}. Reporting manager: <b>${manager}</b>${approval.MANAGER_EMAIL_ID?` (${approval.MANAGER_EMAIL_ID})`:''}.</p><h3>Company brief</h3><p>Divyanshi Capital supports customers across loan products through transparent eligibility checks, document coordination, bank mapping and service follow-up. Use only approved data, protect customer information and keep every activity updated.</p><h3>Your work links</h3><ul>${linkHtml}</ul><h3>First-day formalities</h3><ol><li>Read the company and role brief.</li><li>Review Terms & Conditions and confidentiality rules.</li><li>Open your Personal File and verify manager, role, mobile and email.</li><li>Complete attendance/check-in and contact HR if any mapping is wrong.</li></ol>${tcUrl?`<p><a href="${tcUrl}">Read Terms & Conditions</a></p>`:''}<p>Company website: <a href="${companyUrl}">${companyUrl}</a></p><p>Regards,<br><b>HR Avatar — Divyanshi Capital</b></p></div>`;
+    const attachments=[];
+    ['HR_ICARD_FILE_ID','HR_TC_FILE_ID'].forEach(k=>{const id=props.getProperty(k)||'';if(id){try{attachments.push(DriveApp.getFileById(id).getBlob());}catch(_){}}});
+    const cc=[DC_CFG.COMPANY.HR_EMAIL,DC_CFG.COMPANY.MD_EMAIL].filter(Boolean);
+    if(!P1_MAIL_QUOTA_(1+cc.length,'JOINING_KIT'))return false;
+    MailApp.sendEmail({to,cc:cc.join(','),subject:`Welcome to Divyanshi Capital | ${emp.EMP_CODE} | Joining Kit`,body:`Welcome ${emp.NAME||''}. Employee Code: ${emp.EMP_CODE}. Please open your joining kit links.`,htmlBody:html,attachments});
+    return true;
+  }catch(e){LOG_ERR_('SEND_EMPLOYEE_JOINING_KIT',emp.EMP_CODE||'',e.message);return false;}
+}
+
+function HR_DAILY_ONBOARDING_FOLLOWUP_(){
+  try{
+    const sh=SHEET_('HR_MD_APPROVAL');if(!sh||sh.getLastRow()<2)return;
+    const data=sh.getDataRange().getValues(),h=data[0].map(DC_NORM_);let pending=[];
+    data.slice(1).forEach(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);if(String(o.ONBOARD_DONE||'').toUpperCase()!=='YES')pending.push(`${o.CANDIDATE_ID||''}|${o.EMPLOYEES_NAME||''}|${o.STATUS||'PENDING'}|EMP:${o.EMP_CODE||'NOT ASSIGNED'}`);});
+    if(pending.length)DC_SEND_TG_(`🧑‍💼 *HR AVATAR DAILY FOLLOW-UP*\n${pending.slice(0,20).join('\n')}\n→ Verify interview, approval, EMP_CODE, salary, manager, joining date and attendance readiness.`);
+  }catch(e){LOG_ERR_('HR_DAILY_ONBOARDING_FOLLOWUP','',e.message);}
 }
 
 /* ================================================================
    SECTION 21 — SETUP + MIS TRIGGERS
    ================================================================ */
+
 function SETUP_STANDALONE_() {
   Logger.log('═══════════════════════════════');
-  Logger.log('  DIVYANSHI CAPITAL — SETUP');
+  Logger.log('  DIVYANSHI CAPITAL — V9.3.0-FAST SETUP');
   Logger.log('═══════════════════════════════');
-
-  if (!MASTER_SS_ID || MASTER_SS_ID.length < 20) {
-    throw new Error('MASTER_SS_ID missing');
-  }
-
-  const props = PropertiesService.getScriptProperties();
-  const setupValues = {
-    MASTER_FILE_ID: MASTER_SS_ID,
-    P1_MASTER_FILE_ID: MASTER_SS_ID
-  };
-
+  if(!MASTER_SS_ID||MASTER_SS_ID.length<20)throw new Error('MASTER_SS_ID missing');
+  Logger.log('✅ MASTER_SS_ID: '+MASTER_SS_ID);
+  const setupProps=PropertiesService.getScriptProperties();
+  P1_MIGRATE_CORE_PROPERTIES_();
+  setupProps.setProperty('MASTER_FILE_ID', MASTER_SS_ID);
   try {
-    const execUrl = ScriptApp.getService().getUrl();
-    if (execUrl) {
-      setupValues.P1_EXEC_URL = execUrl;
-      setupValues.MAIN_SERVER_EXEC_URL = execUrl;
-      Logger.log('✅ Exec URL: ' + execUrl);
-    }
-  } catch (_) {
-    Logger.log('⚠ Deploy as Web App first');
-  }
-
-  props.setProperties(setupValues);
-
-  let updated = 0;
-
-  // Ensure MALLIK_API_KEY exists in Script Properties.
-  // Never overwrite an existing key.
-  if (!props.getProperty('MALLIK_API_KEY')) {
-    props.setProperty(
-      'MALLIK_API_KEY',
-      (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '')
-    );
-    updated++;
-  }
-
-  INVALIDATE_ALL_CACHES_();
-  Logger.log(`✅ ${updated} propert${updated === 1 ? 'y' : 'ies'} saved. Cache cleared.`);
-  return 'SETUP_OK';
+    const execUrl=ScriptApp.getService().getUrl();
+    if(execUrl){setupProps.setProperty('P1_EXEC_URL',execUrl);Logger.log('✅ Exec URL: '+execUrl);}
+  } catch(_){Logger.log('⚠ Deploy as Web App first');}
+  if(!setupProps.getProperty('MALLIK_API_KEY'))setupProps.setProperty('MALLIK_API_KEY',(Utilities.getUuid()+Utilities.getUuid()).replace(/-/g,''));
+  // Audit metadata only; it never grants Google or Apps Script permissions.
+  if(!setupProps.getProperty('AI_STUDIO_PUBLISHER_EMAIL'))setupProps.setProperty('AI_STUDIO_PUBLISHER_EMAIL','u.raghav003@gmail.com');
+  try{const ss=SpreadsheetApp.openById(MASTER_SS_ID);Logger.log('✅ Sheet: '+ss.getName()+' | '+ss.getSheets().length+' tabs');}catch(e){throw new Error('Sheet open failed: '+e.message);}
+  Logger.log('═══════════════════════════════  SETUP COMPLETE ✅  Next → DC_INSTALL_P1_FINAL_()');
 }
 
 function DC_INSTALL_P1_FINAL_() {
   const ss=DC_GET_SS_();
   Object.keys(P1_TAB_MAP).forEach(name=>{if(!ss.getSheetByName(name))ss.insertSheet(name);P1_ENSURE_HEADERS_(ss.getSheetByName(name),P1_TAB_MAP[name]());});
   ['AVATAR_ACTIVITY_LOG','NOTIFY_QUEUE'].forEach(n=>{if(!ss.getSheetByName(n))ss.insertSheet(n);});
-  const snSh=ss.getSheetByName('SOURCE_NAME');
-  if(snSh&&snSh.getLastRow()<=1){
-    P1_ENSURE_HEADERS_(snSh,P1_TAB_MAP.SOURCE_NAME());
-    snSh.getRange(2,1,17,2).setValues([['Sales Team','SALES'],['Manual Calling','SALES'],['AI Auto Calling','SALES'],['WhatsApp','SALES'],['Website','SALES'],['Referral','SALES'],['Walk-in','SALES'],['Instagram','SALES'],['Facebook','SALES'],['LinkedIn','SALES'],['Email Campaign','SALES'],['Bank Referral','SALES'],['GoDial Auto Calling','SALES'],['DSA','LOGIN DEPARTMENT'],['Send to Login','LOGIN DEPARTMENT'],['MIS-Incoming','REPORT'],['ONBOARD','HR']]);
-  }
-  // Make ALL_EMPLOYEES self-maintaining before staff links are shared.
-  P1_NORMALIZE_ALL_EMPLOYEES_();
-  const managed=['MIS_PIPELINE_RUN_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','WARM_CACHE_','onEdit','P1_FORM_SUBMIT'];
+  SYNC_SOURCE_NAME_MASTER_();
+  P1_CLIENT_DOCS_ROOT_();
+  const managed=['MIS_PIPELINE_RUN_','SYNC_MASTER_CONTROL_CENTER_','SEND_EVENING_MIS_REPORT_','ATTENDANCE_EOD_REPORT_','HR_DAILY_ONBOARDING_FOLLOWUP_','P1_ROLE_DASHBOARD_DAILY_','onEdit','P1_ON_EDIT_INSTALLABLE','P1_FORM_SUBMIT'];
   ScriptApp.getProjectTriggers().forEach(t=>{if(managed.includes(t.getHandlerFunction()))ScriptApp.deleteTrigger(t);});
   ScriptApp.newTrigger('MIS_PIPELINE_RUN_').timeBased().everyMinutes(15).create();
-  ScriptApp.newTrigger('WARM_CACHE_').timeBased().everyMinutes(8).create();
+  ScriptApp.newTrigger('SYNC_MASTER_CONTROL_CENTER_').timeBased().everyHours(1).create();
   ScriptApp.newTrigger('SEND_EVENING_MIS_REPORT_').timeBased().atHour(19).everyDays(1).create();
   ScriptApp.newTrigger('ATTENDANCE_EOD_REPORT_').timeBased().atHour(20).everyDays(1).create();
-  try{ScriptApp.newTrigger('onEdit').forSpreadsheet(ss).onEdit().create();}catch(_){}
+  ScriptApp.newTrigger('HR_DAILY_ONBOARDING_FOLLOWUP_').timeBased().atHour(10).everyDays(1).create();
+  ScriptApp.newTrigger('P1_ROLE_DASHBOARD_DAILY_').timeBased().atHour(6).everyDays(1).create();
+  try{ScriptApp.newTrigger('P1_ON_EDIT_INSTALLABLE').forSpreadsheet(ss).onEdit().create();}catch(_){}
   try{ScriptApp.newTrigger('P1_FORM_SUBMIT').forSpreadsheet(ss).onFormSubmit().create();}catch(_){}
   P1_SET_TG_WEBHOOK_();
+  SYNC_MASTER_CONTROL_CENTER_();
   Logger.log('✅ DC_INSTALL_P1_FINAL_ complete');
   return'INSTALL_OK';
 }
@@ -1678,7 +1790,7 @@ function SEND_EVENING_MIS_REPORT_() {
     tgMsg+='\n*TOP PERFORMERS:*\n';
     Object.entries(empCount).sort((a,b)=>b[1]-a[1]).slice(0,5).forEach(([code,cnt])=>{const name=(empMap[code]&&empMap[code].NAME)||code;tgMsg+=`• ${name}(${code}): ${cnt}\n`;});
     DC_SEND_TG_(tgMsg);
-    if(MailApp.getRemainingDailyQuota()>0)MailApp.sendEmail({to:DC_CFG.COMPANY.MD_EMAIL,cc:DC_CFG.COMPANY.FOUNDER_EMAIL+','+DC_CFG.COMPANY.HR_EMAIL,subject:'[DAILY MIS] Divyanshi Capital — '+today,body:tgMsg.replace(/\*/g,'').replace(/_/g,''),name:'Bulbhul AI'});
+    if(MailApp.getRemainingDailyQuota()>0)MailApp.sendEmail({to:DC_CFG.COMPANY.MD_EMAIL,cc:DC_CFG.COMPANY.FOUNDER_EMAIL+','+DC_CFG.COMPANY.HR_EMAIL,subject:'[DAILY MIS] Divyanshi Capital — '+today,body:tgMsg.replace(/\*/g,'').replace(/_/g,''),name:'Divyanshi Assistant'});
     Logger.log('✅ Evening MIS sent: '+today);
   } catch(e){ LOG_ERR_('SEND_EVENING_MIS_REPORT','',e.message); }
 }
@@ -1711,16 +1823,14 @@ function doGet(e) {
   if(!emp){try{const email=String(Session.getActiveUser().getEmail()||'').toLowerCase();if(email){const map=DC_BUILD_EMP_MAP_();for(const code of Object.keys(map)){if(map[code].EMAIL===email){emp=code;break;}}}}catch(_){}}
   try {
     const base=P1_GET_EXEC_URL_();
-    if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Smart Intake | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    if(page==='calling')return HtmlService.createHtmlOutputFromFile('calling').setTitle('Bulbhul Calling | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    if(page==='voice')return HtmlService.createHtmlOutputFromFile('voice').setTitle('Bulbhul Voice | Divyanshi Capital').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    const publicProfile=emp?P1_GET_PUBLIC_CARD_PROFILE_(emp):null;
-    // Dashboard data is loaded only after client-side session verification; never embed case data in a public URL response.
-    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:publicProfile,avatar:(page==='card'&&emp)?publicProfile:null,dashboard:null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
+    if(page==='form'||page==='apply')return HtmlService.createHtmlOutputFromFile('smart_form').setTitle('Divyanshi Capital AI Based OS — Smart Intake').addMetaTag('viewport','width=device-width,initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    if(page==='calling'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return P1_HTML_FROM_FILES_(['DC_CALLING_APP','calling']).setTitle('Divyanshi Capital AI Based OS — Calling').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
+    if(page==='voice'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token))return HtmlService.createHtmlOutputFromFile('voice').setTitle('Divyanshi Capital AI Based OS — Voice').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
+    const bootData={baseUrl:base,page,emp,products:GET_ACTIVE_LOAN_PRODUCTS_(),banks:P1_GET_BANK_OPTIONS_MAP_(),staff:P1_GET_STAFF_PUBLIC_DATA_(emp),dashboard:page==='dashboard'&&P1_VALIDATE_ACCESS_TOKEN_(emp,p.access_token)?P1_GET_STAFF_DASHBOARD_DATA_(emp):null,eligibility:page==='elig'&&p.income?P1_CHECK_ELIGIBILITY_({MONTHLY_INCOME:Number(p.income),EXISTING_EMI:Number(p.emi||0),AGE:Number(p.age||28),LOAN_TYPE:p.loan||''}):null};
     let html=HtmlService.createHtmlOutputFromFile('index').getContent();
     html=html.split('__P1_BOOT_DATA_JSON__').join(JSON.stringify(bootData).replace(/</g,'\\u003c'));
-    return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital — P1 Digital Duniya').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  } catch(err){ LOG_ERR_('doGet','PAGE_RENDER',err.message); return HtmlService.createHtmlOutput(`<div style="font-family:Arial;padding:40px"><h2 style="color:#dc2626">Load Error</h2><p>${err.message}</p></div>`); }
+    return HtmlService.createHtmlOutput(html).setTitle('Divyanshi Capital AI Based OS').addMetaTag('viewport','width=device-width,initial-scale=1,maximum-scale=1');
+  } catch(err){ const ref='ERR_'+Date.now();LOG_ERR_('doGet',ref,err.message); return HtmlService.createHtmlOutput(`<div style="font-family:Arial;padding:40px"><h2 style="color:#dc2626">Page unavailable</h2><p>Please retry or contact support. Reference: ${ref}</p></div>`); }
 }
 
 function doPost(e) {
@@ -1734,6 +1844,8 @@ function doPost(e) {
 
     // ── Telegram webhook (no auth needed) ──
     if (body.update_id && body.message) {
+      const tgSecret=String(PropertiesService.getScriptProperties().getProperty('TG_WEBHOOK_SECRET')||'').trim();
+      if(!tgSecret||!P1_CONST_EQ_(tgSecret,String(e.parameter&&e.parameter.tg_secret||'')))return ContentService.createTextOutput('UNAUTHORIZED');
       if (P1_TG_DUPLICATE_(body.update_id)) return ContentService.createTextOutput('DUPLICATE');
       return ContentService.createTextOutput(P1_TG_HANDLE_(body));
     }
@@ -1752,7 +1864,7 @@ function doPost(e) {
     if (action === 'submit_lead')  return jsonResp_(P1_SMART_FORM_SUBMIT_(body.payload || body));
     if (action === 'get_products') return jsonResp_({ ok: true, data: GET_ACTIVE_LOAN_PRODUCTS_() });
     if (action === 'get_banks')    return jsonResp_({ ok: true, data: P1_GET_BANK_OPTIONS_MAP_() });
-    if (action === 'health_check') return jsonResp_({ ok: true, ts: new Date().toISOString(), version: 'V9.3.0-FAST' });
+    if (action === 'health_check') return jsonResp_(P1_PUBLIC_HEALTH_());
 
     // ── Auth gate ──
     if (!auth) return jsonResp_({ ok: false, err: 'Unauthorized' });
@@ -1761,21 +1873,27 @@ function doPost(e) {
     const payload = (body.payload && typeof body.payload === 'object') ? body.payload : body;
 
     // ── Authenticated actions ──
-    if (action === 'chat')             return jsonResp_({ ok: true, reply: BULBHUL_CHAT_API_(payload) });
+    if (action === 'chat')             { const actor=P1_REQUIRE_API_ACTOR_(payload); if(!actor)return jsonResp_({ok:false,err:'Employee session required'}); payload.empCode=actor.EMP_CODE; payload.accessToken=payload.accessToken||payload.access_token; return jsonResp_({ ok: true, reply: BULBHUL_CHAT_API_(payload) }); }
     if (action === 'check_elig')       return jsonResp_({ ok: true, result: P1_CHECK_ELIGIBILITY_(payload) });
-    if (action === 'manager_checkin')  return jsonResp_(MANAGER_SELFIE_CHECKIN_(payload.empCode, payload.half || 1));
-    if (action === 'get_dashboard')    return jsonResp_(P1_GET_STAFF_DASHBOARD_DATA_(payload.empCode));
-    if (action === 'update_lead')      return jsonResp_(UPDATE_LEAD_STATUS_(payload.query, payload.status, payload.remark));
-    if (action === 'run_mis')          { MIS_PIPELINE_RUN_(); return jsonResp_({ ok: true, msg: 'MIS triggered' }); }
-    if (action === 'clear_cache')      { INVALIDATE_ALL_CACHES_(); return jsonResp_({ ok: true, msg: 'All caches cleared' }); }
-    if (action === 'sync_emp_links')   { const r=P1_MAP_HTML_LINKS_(); return jsonResp_({ ok: true, msg: r }); }
-    if (action === 'get_avatar_profile') return jsonResp_(P1_GET_AVATAR_PROFILE_(payload.empCode));
-    if (action === 'generate_post')    return jsonResp_(GENERATE_LOAN_POST_(payload.empCode, payload.loanType, payload.sourceName, payload.customMsg));
-    if (action === 'post_facebook')    return jsonResp_(POST_TO_FACEBOOK_(payload.empCode, payload.message, payload.imageUrl));
-    if (action === 'post_instagram')   return jsonResp_(POST_TO_INSTAGRAM_(payload.empCode, payload.caption, payload.imageUrl));
-    if (action === 'avatar_learn')     { AVATAR_LEARN_(payload.empCode, payload.type, payload.data || {}); return jsonResp_({ ok: true }); }
+    if (action === 'manager_checkin')  { const actor=P1_REQUIRE_API_ACTOR_(payload); if(!actor)return jsonResp_({ok:false,err:'Employee session required'}); return jsonResp_(MANAGER_SELFIE_CHECKIN_(actor.EMP_CODE, payload.half || 1)); }
+    if (action === 'get_dashboard')    { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?P1_GET_STAFF_DASHBOARD_DATA_(actor.EMP_CODE):{ok:false,err:'Employee session required'}); }
+    if (action === 'get_master_control') { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?P1_GET_MASTER_CONTROL_(actor.EMP_CODE):{ok:false,err:'Employee session required'}); }
+    if (action === 'update_lead')      { const actor=P1_REQUIRE_API_ACTOR_(payload),lead=actor&&GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===String(payload.query||'').toUpperCase()||DC_CLEAN_MOBILE_(c.CLIENT_MOBILE||'')===DC_CLEAN_MOBILE_(payload.query||'')); return jsonResp_(actor&&lead&&P1_CALLING_CAN_ACCESS_(actor,lead)?UPDATE_LEAD_STATUS_(lead.LEAD_ID,payload.status,payload.remark):{ok:false,err:'Employee session or case access denied'}); }
+    if (action === 'run_mis')          { const actor=P1_REQUIRE_API_ACTOR_(payload); if(!actor||!P1_HAS_MASTER_ACCESS_(actor))return jsonResp_({ok:false,err:'Master access required'}); MIS_PIPELINE_RUN_(); return jsonResp_({ ok: true, msg: 'MIS triggered' }); }
+    if (action === 'clear_cache')      { const actor=P1_REQUIRE_API_ACTOR_(payload); if(!actor||!P1_HAS_MASTER_ACCESS_(actor))return jsonResp_({ok:false,err:'Master access required'}); INVALIDATE_ALL_CACHES_(); return jsonResp_({ ok: true, msg: 'All caches cleared' }); }
+    if (action === 'get_avatar_profile') { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?P1_GET_AVATAR_PROFILE_(actor.EMP_CODE):{ok:false,err:'Employee session required'}); }
+    if (action === 'generate_post')    { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?GENERATE_LOAN_POST_(actor.EMP_CODE, payload.loanType, payload.sourceName, payload.customMsg):{ok:false,err:'Employee session required'}); }
+    if (action === 'post_facebook')    { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?POST_TO_FACEBOOK_(actor.EMP_CODE, payload.message, payload.imageUrl):{ok:false,err:'Employee session required'}); }
+    if (action === 'post_instagram')   { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?POST_TO_INSTAGRAM_(actor.EMP_CODE, payload.caption, payload.imageUrl):{ok:false,err:'Employee session required'}); }
+    if (action === 'avatar_learn')     { const actor=P1_REQUIRE_API_ACTOR_(payload); if(!actor)return jsonResp_({ok:false,err:'Employee session required'}); AVATAR_LEARN_(actor.EMP_CODE, payload.type, payload.data || {}); return jsonResp_({ ok: true }); }
+    if (action === 'website_lead')     return jsonResp_(P1_WEBSITE_LEAD_SUBMIT_(payload));
     if (action === 'voice_notify')     return jsonResp_(GET_VOICE_NOTIFICATION_(payload.event, payload.data));
-    if (action === 'verify_emp') return jsonResp_(P1_VERIFY_EMP(payload));
+    if (action === 'verify_emp') return jsonResp_(P1_VERIFY_ACCESS(payload.empCode, payload.pin));
+    if (action === 'change_pin')       { const actor=P1_REQUIRE_API_ACTOR_(payload); return jsonResp_(actor?P1_CHANGE_PIN(actor.EMP_CODE,payload.accessToken,payload.currentPin,payload.newPin):{ok:false,err:'Employee session required'}); }
+    if (action === 'forgot_pin')       return jsonResp_(P1_FORGOT_PIN(payload.empCode,payload.email));
+    if (action === 'verify_pin_otp')   return jsonResp_(P1_VERIFY_OTP(payload.empCode,payload.otp));
+    if (action === 'reset_pin')        return jsonResp_(P1_RESET_PIN(payload.empCode,payload.resetToken,payload.newPin));
+    if (action === 'logout')            return jsonResp_(P1_LOGOUT(payload.empCode,payload.accessToken));
 
     return jsonResp_({ ok: false, err: 'Unknown action: ' + action });
 
@@ -1792,96 +1910,88 @@ function jsonResp_(obj) {
    SECTION 23 — PUBLIC WRAPPERS + MENU
    ================================================================ */
 
-function BULBHUL_CHAT_API(d)          { return BULBHUL_CHAT_API_(d); }
+function BULBHUL_CHAT_API(d)          { d=d||{};return P1_VALIDATE_ACCESS_TOKEN_(d.empCode,d.accessToken)?BULBHUL_CHAT_API_(d):'Employee access expired. Verify EMP_CODE and PIN again.'; }
 function GET_ACTIVE_LOAN_PRODUCTS()   { return GET_ACTIVE_LOAN_PRODUCTS_(); }
 function P1_GET_BANK_OPTIONS_MAP()    { return P1_GET_BANK_OPTIONS_MAP_(); }
-function MANAGER_CHECKIN_API(d)       { return MANAGER_SELFIE_CHECKIN_(d.empCode,d.half||1); }
-function RUN_MIS_PIPELINE_NOW()       { MIS_PIPELINE_RUN_(); }
-function RUN_MIS_EVENING_REPORT()     { SEND_EVENING_MIS_REPORT_(); }
-function CLEAR_CACHE_NOW()            { INVALIDATE_ALL_CACHES_(); Logger.log('✅ All caches cleared'); }
-function SYNC_ALL_EMP_LINKS()         { return P1_MAP_HTML_LINKS_(); }
-
-// Pre-warms ScriptCache every 8 min so doGet cold-start is <1s
-function WARM_CACHE_() {
-  try { DC_BUILD_EMP_MAP_(); } catch(_){}
-  try { GET_ACTIVE_LOAN_PRODUCTS_(); } catch(_){}
-  try { P1_GET_BANK_OPTIONS_MAP_(); } catch(_){}
-}
+function MANAGER_CHECKIN_API(d)       { const a=P1_REQUIRE_API_ACTOR_(d||{}); return a?MANAGER_SELFIE_CHECKIN_(a.EMP_CODE,d.half||1):{ok:false,err:'Employee session required'}; }
+function RUN_MIS_PIPELINE_NOW()       { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); MIS_PIPELINE_RUN_(); }
+function RUN_MIS_EVENING_REPORT()     { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); SEND_EVENING_MIS_REPORT_(); }
+function CLEAR_CACHE_NOW()            { if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required'); INVALIDATE_ALL_CACHES_(); Logger.log('✅ All caches cleared'); }
 
 function P1_MAP_HTML_LINKS_() {
   const sh = SHEET_('ALL_EMPLOYEES');
   if (!sh) throw new Error('ALL_EMPLOYEES missing');
-  return P1_NORMALIZE_ALL_EMPLOYEES_();
-}
+  const data = sh.getDataRange().getValues();
+  if (data.length < 2) throw new Error('ALL_EMPLOYEES empty');
 
-const P1_EMPLOYEE_CORE_FIELDS_=['EMP_CODE','EMPLOYEES_NAME','ROLE','DEPARTMENT','EMPLOYEE_EMAIL_ID','MOBILE','MANAGER_EMAIL_ID'];
-const P1_PASSWORD_CONTROL_COLS_=['PASSWORD_RESET_INPUT','PASSWORD_STATUS','PASSWORD_CHANGED_AT'];
+  const headers = data[0].map(DC_NORM_);
+  const base = P1_GET_EXEC_URL_(),portal=String(PropertiesService.getScriptProperties().getProperty('EMPLOYEE_PORTAL_URL')||'').trim().replace(/\/$/,'');
 
-function P1_EMPLOYEE_HEADERS_(){ return P1_TAB_MAP.ALL_EMPLOYEES().concat(AVATAR_SOCIAL_COLS_,P1_PASSWORD_CONTROL_COLS_); }
+  function ensureCol(name) {
+    const norm = DC_NORM_(name);
+    let i = headers.indexOf(norm);
+    if (i === -1) {
+      const newCol = sh.getLastColumn() + 1;
+      sh.getRange(1, newCol).setValue(name);
+      i = newCol - 1;
+      headers.push(norm);
+    }
+    return i;
+  }
 
-/* HR/master-only reset control. The entered password is hashed in Script
- * Properties and the sheet cell is immediately cleared; passwords are never
- * retained or displayed in ALL_EMPLOYEES. Protect this column in Sheets. */
-function P1_PROCESS_EMPLOYEE_PASSWORD_RESET_(sh,row,headers) {
-  const h=headers.map(DC_NORM_), idx=n=>h.indexOf(DC_NORM_(n));
-  const code=String(sh.getRange(row,idx('EMP_CODE')+1).getValue()||'').trim().toUpperCase();
-  const inputIndex=idx('PASSWORD_RESET_INPUT'), statusIndex=idx('PASSWORD_STATUS'), changedIndex=idx('PASSWORD_CHANGED_AT');
-  if(!code||inputIndex<0||statusIndex<0||changedIndex<0)return;
-  const inputCell=sh.getRange(row,inputIndex+1), password=String(inputCell.getValue()||'');
-  if(!password)return;
-  inputCell.clearContent();
-  const actor=String(Session.getActiveUser().getEmail()||'').trim().toLowerCase();
-  const allowed=String(PropertiesService.getScriptProperties().getProperty('PASSWORD_RESET_ALLOWED_EMAILS')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
-  if(!actor||!allowed.includes(actor)){sh.getRange(row,statusIndex+1).setValue('RESET_BLOCKED: master authorization required');return;}
-  if(password.length<8||password.length>64){sh.getRange(row,statusIndex+1).setValue('RESET_REJECTED: 8–64 characters required');return;}
-  const props=PropertiesService.getScriptProperties(),salt=Utilities.getUuid();
-  props.setProperties({['PIN_HASH_'+code]:P1_PIN_DIGEST_(code,password,salt),['PIN_SALT_'+code]:salt});
-  props.deleteProperty('PIN_'+code); SC_.remove(P1_AUTH_FAILURE_KEY_(code));
-  sh.getRange(row,statusIndex+1).setValue('PASSWORD_SET');
-  sh.getRange(row,changedIndex+1).setValue(new Date());
-}
+  const iCode = headers.indexOf(DC_NORM_('EMP_CODE'));
+  const iEmail = headers.indexOf(DC_NORM_('EMPLOYEE_EMAIL'));
+  const iName = headers.indexOf(DC_NORM_('EMPLOYEES_NAME'));
+  if (iCode === -1) throw new Error('EMP_CODE column missing in ALL_EMPLOYEES');
 
-/* Idempotent schema + per-row employee link provisioning. It never creates a
-   Telegram or WhatsApp identity: those require a separately verified channel. */
-function P1_SYNC_EMPLOYEE_ROW_(sh,row) {
-  const headers=P1_ENSURE_HEADERS_(sh,P1_EMPLOYEE_HEADERS_());
-  if(row<2) return {ok:false,err:'Header row'};
-  P1_PROCESS_EMPLOYEE_PASSWORD_RESET_(sh,row,headers);
-  const h=headers.map(DC_NORM_), idx=n=>h.indexOf(DC_NORM_(n));
-  const values=sh.getRange(row,1,1,headers.length).getValues()[0];
-  const read=n=>String(values[idx(n)]||'').trim();
-  const missing=P1_EMPLOYEE_CORE_FIELDS_.filter(n=>!read(n));
-  if(missing.length) return {ok:false,pending:true,missing};
-  const code=read('EMP_CODE').toUpperCase(), name=read('EMPLOYEES_NAME')||code, base=P1_GET_EXEC_URL_();
-  const write=(n,v)=>{const i=idx(n);if(i>=0)sh.getRange(row,i+1).setValue(v);};
-  const formula=(n,url,label)=>{const i=idx(n);if(i>=0)sh.getRange(row,i+1).setFormula(`=HYPERLINK("${url}","${label}")`);};
-  const url=page=>`${base}?page=${page}&emp=${encodeURIComponent(code)}`;
-  if(!read('BRAND_NAME')) write('BRAND_NAME','Divyanshi Capital');
-  if(!read('ACTIVE_STATUS')) write('ACTIVE_STATUS','PENDING_SETUP');
-  if(!read('CREATED_AT')) write('CREATED_AT',new Date());
-  if(!read('WHATSAPP_VERIFIED')) write('WHATSAPP_VERIFIED','PENDING_VERIFICATION');
-  if(!read('TELEGRAM_STATUS')) write('TELEGRAM_STATUS','PENDING_VERIFICATION');
-  if(!read('P1_AVATAR_URL')) write('P1_AVATAR_URL',`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=200`);
-  if(!base){write('P1_SYNC_STATUS','WEB_APP_URL_REQUIRED');write('UPDATED_AT',new Date());return {ok:false,pending:true,err:'Web App URL missing'};}
-  formula('P1_WEBSITE_URL',url('home'),'🌐 Employee Website');
-  formula('P1_DIGITAL_CARD_URL',url('card'),'💼 Digital Card');
-  formula('P1_SMART_FORM_URL',url('form'),'📝 Apply Link');
-  formula('P1_DASHBOARD_URL',url('dashboard'),'🔐 Staff Login');
-  write('P1_QR_TEXT',url('card'));
-  write('P1_SYNC_STATUS','CONNECTED');write('P1_LAST_SYNC_AT',new Date());write('UPDATED_AT',new Date());
+  const p1Cols = {
+    web: ensureCol('P1_WEBSITE_URL'),
+    card: ensureCol('P1_DIGITAL_CARD_URL'),
+    form: ensureCol('P1_SMART_FORM_URL'),
+    dash: ensureCol('P1_DASHBOARD_URL'),
+    workspace: ensureCol('P1_WORKSPACE_URL'),
+    call: ensureCol('P1_CALLING_URL'),
+    voice: ensureCol('P1_VOICE_URL'),
+    avt: ensureCol('P1_AVATAR_URL'),
+    sync: ensureCol('P1_SYNC_STATUS'),
+    at: ensureCol('P1_LAST_SYNC_AT')
+  };
+
+  let updated = 0;
+  for (let i = 1; i < data.length; i++) {
+    const code = String(data[i][iCode] || '').trim().toUpperCase();
+    if (!code) continue;
+    const name = String(iName > -1 ? data[i][iName] : code).trim() || code;
+    const e = encodeURIComponent(code);
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=160`;
+    const row = i + 1;
+    const employee = FIND_EMPLOYEE_FULL_(code);
+    const canCall = P1_ROLE_CAN_USE_CALLING_(employee);
+
+    const cardUrl=`${base}?page=card&emp=${e}`;
+    sh.getRange(row, p1Cols.web + 1).setFormula(`=HYPERLINK("${cardUrl}","🌐 Digital Profile")`);
+    sh.getRange(row, p1Cols.card + 1).setFormula(`=HYPERLINK("${cardUrl}","🪪 Card")`);
+    const routeEmail = iEmail>-1 ? DC_CLEAN_EMAIL_(data[i][iEmail]) : '';
+    const routeSig = routeEmail ? P1_ROUTE_SIGNATURE_(code,routeEmail) : '';
+    const route = `&manager_email_id=${encodeURIComponent(routeEmail)}&route_signature=${encodeURIComponent(routeSig)}`;
+    sh.getRange(row, p1Cols.form + 1).setFormula(`=HYPERLINK("${base}?page=form&emp=${e}${route}","📝 Form")`);
+    sh.getRange(row, p1Cols.dash + 1).setFormula(`=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dashboard")`);
+    const workspaceCell=sh.getRange(row, p1Cols.workspace + 1);if(portal)workspaceCell.setFormula(`=HYPERLINK("${portal}?emp=${e}","🔐 Staff Workspace")`);else workspaceCell.clearContent();
+    const callingCell=sh.getRange(row, p1Cols.call + 1),voiceCell=sh.getRange(row, p1Cols.voice + 1);
+    if(canCall){
+      callingCell.setFormula(`=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`);
+      voiceCell.setFormula(`=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`);
+    } else { callingCell.clearContent(); voiceCell.clearContent(); }
+    sh.getRange(row, p1Cols.avt + 1).setValue(avatar);
+    sh.getRange(row, p1Cols.sync + 1).setValue('CONNECTED');
+    sh.getRange(row, p1Cols.at + 1).setValue(new Date());
+    updated++;
+  }
+
   INVALIDATE_ALL_CACHES_();
-  return {ok:true,empCode:code};
-}
-
-function P1_NORMALIZE_ALL_EMPLOYEES_() {
-  const sh=SHEET_('ALL_EMPLOYEES'); if(!sh)throw new Error('ALL_EMPLOYEES missing');
-  P1_ENSURE_HEADERS_(sh,P1_EMPLOYEE_HEADERS_());
-  const last=sh.getLastRow(); if(last<2)return 'ALL_EMPLOYEES schema ready; add employee rows to provision links.';
-  let updated=0,pending=0;
-  for(let row=2;row<=last;row++){const r=P1_SYNC_EMPLOYEE_ROW_(sh,row);if(r.ok)updated++;else if(r.pending)pending++;}
-  styleHeaderRow_(sh,sh.getLastColumn());
-  Logger.log(`✅ Employee automation: ${updated} connected, ${pending} pending core fields/configuration`);
-  return `Employee automation complete: ${updated} connected, ${pending} pending`;
+  styleHeaderRow_(sh, sh.getLastColumn());
+  Logger.log(`✅ Links mapped: ${updated} employees`);
+  return `HTML links mapped: ${updated}`;
 }
 
 function HEALTH_CHECK_() {
@@ -1896,6 +2006,7 @@ function HEALTH_CHECK_() {
   chk('AI keys',()=>{return[!!DC_CFG.DEEPSEEK_KEY,!!DC_CFG.OPENAI_KEY,!!DC_CFG.GEMINI_KEY].filter(Boolean).length+'/3 set';});
   chk('Exec URL',()=>{const url=P1_GET_EXEC_URL_();if(!url)throw new Error('Not deployed');return url.slice(0,55)+'...';});
   chk('Emp cache',()=>{const m=DC_BUILD_EMP_MAP_();return Object.keys(m).length+' loaded';});
+  chk('DC002 master identity',()=>{const md=FIND_EMPLOYEE_FULL_('DC002');if(!md||!P1_HAS_MASTER_ACCESS_(md))throw new Error('DC002 must be active with ROLE MD/FOUNDER or ACCESS_LEVEL ALL');return md.NAME+' | '+md.ROLE+' | '+md.DASHBOARD_ACCESS;});
   chk('ScriptCache',()=>{SC_.put('HC_TEST','1',10);const v=SC_.get('HC_TEST');if(v!=='1')throw new Error('Failed');SC_.remove('HC_TEST');return'OK';});
   Logger.log('════════════════════════════');
   Logger.log('  '+p+' PASS | '+f+' FAIL');
@@ -1906,7 +2017,7 @@ function HEALTH_CHECK_() {
 
 function onOpen() {
   try {
-    SpreadsheetApp.getUi().createMenu('🤖 BULBHUL AI')
+    SpreadsheetApp.getUi().createMenu('🤖 Divyanshi Assistant')
       .addItem('▶ Run MIS Pipeline Now',        'RUN_MIS_PIPELINE_NOW')
       .addItem('📊 Evening MIS Report',          'RUN_MIS_EVENING_REPORT')
       .addSeparator()
@@ -1929,14 +2040,14 @@ function onOpen() {
 function technicalFixes() {
   let ui;
   try { ui = SpreadsheetApp.getUi(); } catch(_) {
-    Logger.log('⚠ Run this from the Sheet menu, not Script Editor.\nOpen Sheet → 🤖 BULBHUL AI → 🛠 Technical Fixes');
+    Logger.log('⚠ Run this from the Sheet menu, not Script Editor.\nOpen Sheet → 🤖 Divyanshi Assistant → 🛠 Technical Fixes');
     return;
   }
   const props = PropertiesService.getScriptProperties();
-
+  
   // ── Option picker ──
   const pick = ui.alert(
-    '🛠 BULBHUL Technical Fixes',
+    '🛠 Divyanshi Assistant Technical Fixes',
     'Choose action:\n\n' +
     '1 → Update Script Properties (MASTER_FILE_ID, API keys, exec URL)\n' +
     '2 → Fix / Provision individual staff (EMP_CODE)\n' +
@@ -1958,7 +2069,7 @@ function technicalFixes() {
     if (empResp.getSelectedButton() === ui.Button.OK) {
       const code = empResp.getResponseText().trim().toUpperCase();
       if (code) {
-        const result = fixIndividualStaff(code);
+        const result = fixIndividualStaff_(code);
         ui.alert('Result', result, ui.ButtonSet.OK);
       }
     }
@@ -1969,20 +2080,21 @@ function technicalFixes() {
       ui.ButtonSet.YES_NO_CANCEL
     );
     if      (pick2 === ui.Button.YES)    { const r=P1_MAP_HTML_LINKS_();   ui.alert('Done', r, ui.ButtonSet.OK); }
-    else if (pick2 === ui.Button.NO)     { CLEAR_CACHE_NOW();              ui.toast('Caches cleared','BULBHUL',3); }
+    else if (pick2 === ui.Button.NO)     { CLEAR_CACHE_NOW();              ui.toast('Caches cleared','Divyanshi Assistant',3); }
     else if (pick2 === ui.Button.CANCEL) { const r=HEALTH_CHECK_();        ui.alert('Health Check', r.pass+' PASS | '+r.fail+' FAIL', ui.ButtonSet.OK); }
   }
 
-  ui.toast('Technical Fixes session complete', 'BULBHUL', 3);
+  ui.toast('Technical Fixes session complete', 'Divyanshi Assistant', 3);
 }
 
 function _techFix_ScriptProperties_(ui, props) {
   const keys = [
-    'MASTER_FILE_ID','P1_EXEC_URL','MALLIK_API_KEY',
+    'MASTER_FILE_ID','P1_EXEC_URL','MALLIK_API_KEY','AI_STUDIO_PUBLISHER_EMAIL',
     'DEEPSEEK_API_KEY','OPENAI_API_KEY','GEMINI_API_KEY',
     'TG_TOKEN','META_WA_TOKEN','META_WA_PHONE_ID',
-    'MD_TG_CHAT_ID','FOUNDER_TG_CHAT_ID','HR_TG_CHAT_ID','ACCOUNTS_TG_CHAT_ID',
-    'TEMPLATE_PERSONAL_FILE_ID','ONBOARDING_DRIVE_FOLDER_ID'
+    'MD_TG_CHAT_ID','FOUNDER_TG_CHAT_ID','HR_TG_CHAT_ID','ACCOUNTS_TG_CHAT_ID','MD_TG_EMP_CODE','FOUNDER_TG_EMP_CODE','HR_TG_EMP_CODE','ACCOUNTS_TG_EMP_CODE','TG_WEBHOOK_SECRET',
+    'TEMPLATE_PERSONAL_FILE_ID','ONBOARDING_DRIVE_FOLDER_ID',
+    'HR_TC_FILE_ID','HR_TC_URL','HR_ICARD_FILE_ID','COMPANY_WEBSITE_URL','EMPLOYEE_PORTAL_URL','PRIVACY_NOTICE_URL','PRIVACY_CONTACT_EMAIL','GRIEVANCE_OFFICER_NAME','CLIENT_RETENTION_DAYS','CANDIDATE_RETENTION_DAYS','CONSENT_VERSION','CLIENT_DOCS_FOLDER_ID','FREEPBX_WEBHOOK_URL','FREEPBX_API_TOKEN','WEBSITE_ROUTE_EMP_CODE','WEBSITE_MANAGER_EMAIL_ID'
   ];
 
   const current = keys.map(k => {
@@ -2008,29 +2120,31 @@ function _techFix_ScriptProperties_(ui, props) {
     if (k && v) { props.setProperty(k, v); updated++; }
   });
 
-  // Auto-detect exec URL if empty
+  P1_MIGRATE_CORE_PROPERTIES_();
+
+  // Auto-detect the one canonical Apps Script URL if empty.
   if (!props.getProperty('P1_EXEC_URL')) {
     try {
       const url = ScriptApp.getService().getUrl();
       if (url) {
         props.setProperty('P1_EXEC_URL', url);
-        props.setProperty('MAIN_SERVER_EXEC_URL', url);
         updated++;
       }
     } catch(_){}
   }
 
-  // Always ensure MALLIK_API_KEY exists — never overwrite an existing key.
+  // Generate a server-side API key once when it is not configured.
   if (!props.getProperty('MALLIK_API_KEY')) {
-    props.setProperty(
-      'MALLIK_API_KEY',
-      (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '')
-    );
-    updated++;
+    props.setProperty('MALLIK_API_KEY',(Utilities.getUuid()+Utilities.getUuid()).replace(/-/g,'')); updated++;
+  }
+
+  // Audit metadata only; do not use this email for authentication decisions.
+  if (!props.getProperty('AI_STUDIO_PUBLISHER_EMAIL')) {
+    props.setProperty('AI_STUDIO_PUBLISHER_EMAIL','u.raghav003@gmail.com'); updated++;
   }
 
   INVALIDATE_ALL_CACHES_();
-  ui.toast(`${updated} propert${updated===1?'y':'ies'} saved. Cache cleared.`, 'BULBHUL', 4);
+  ui.toast(`${updated} propert${updated===1?'y':'ies'} saved. Cache cleared.`, 'Divyanshi Assistant', 4);
 }
 
 /* ================================================================
@@ -2044,7 +2158,7 @@ function _techFix_ScriptProperties_(ui, props) {
    ⑥ Sends welcome TG notification
    Returns status string (shown in UI alert + logged).
    ================================================================ */
-function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
+function fixIndividualStaff_(empCodeOrSheet, empCodeArg) {
   // Accept old signature fixIndividualStaff(sheet, empCode) or new fixIndividualStaff(empCode)
   let empCode;
   if (typeof empCodeOrSheet === 'string') {
@@ -2071,6 +2185,8 @@ function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
     const headers = data[0].map(DC_NORM_);
     const iCode   = headers.indexOf('EMP_CODE');
     const iFile   = headers.indexOf('PERSONAL_FILE_ID');
+    const iSync   = headers.indexOf('P1_SYNC_STATUS');
+    const iAt     = headers.indexOf('P1_LAST_SYNC_AT');
     if (iCode === -1) return 'ERR: EMP_CODE column not found';
 
     let empRowNum = -1;
@@ -2120,12 +2236,15 @@ function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
 
     // ── 5. Re-map P1 link columns for this row only ──
     try {
-      const base = P1_GET_EXEC_URL_();
+      const base = P1_GET_EXEC_URL_(),portal=String(PropertiesService.getScriptProperties().getProperty('EMPLOYEE_PORTAL_URL')||'').trim().replace(/\/$/,'');
       const e    = encodeURIComponent(empCode);
       const name = emp.NAME || empCode;
       const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=160`;
       const personalUrl = fileId ? `https://docs.google.com/spreadsheets/d/${fileId}/edit` : '';
       const qrUrl = `${base}?page=card&emp=${e}`;
+      const routeEmail = DC_CLEAN_EMAIL_(emp.EMAIL||'');
+      const routeQuery = routeEmail ? `&manager_email_id=${encodeURIComponent(routeEmail)}&route_signature=${encodeURIComponent(P1_ROUTE_SIGNATURE_(empCode,routeEmail))}` : '';
+      const canCall = P1_ROLE_CAN_USE_CALLING_(emp);
 
       function colFor(colName) {
         const idx = headers.indexOf(DC_NORM_(colName));
@@ -2138,12 +2257,13 @@ function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
       }
 
       const cols = {
-        P1_WEBSITE_URL    : `=HYPERLINK("${base}?page=home&emp=${e}","🌐 Website")`,
-        P1_SMART_FORM_URL : `=HYPERLINK("${base}?page=form&emp=${e}","📝 Form")`,
+        P1_WEBSITE_URL    : `=HYPERLINK("${base}?page=card&emp=${e}","🌐 Digital Profile")`,
+        P1_SMART_FORM_URL : `=HYPERLINK("${base}?page=form&emp=${e}${routeQuery}","📝 Form")`,
         P1_DIGITAL_CARD_URL:`=HYPERLINK("${base}?page=card&emp=${e}","🪪 Card")`,
         P1_DASHBOARD_URL  : `=HYPERLINK("${base}?page=dashboard&emp=${e}","📊 Dash")`,
-        P1_CALLING_URL    : `=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`,
-        P1_VOICE_URL      : `=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`,
+        P1_WORKSPACE_URL  : portal?`=HYPERLINK("${portal}?emp=${e}","🔐 Workspace")`:'',
+        P1_CALLING_URL    : canCall?`=HYPERLINK("${base}?page=calling&emp=${e}","📞 Calling")`:'',
+        P1_VOICE_URL      : canCall?`=HYPERLINK("${base}?page=voice&emp=${e}","🎙️ Voice")`:'',
         P1_AVATAR_URL     : avatar,
         P1_PERSONAL_FILE_URL: personalUrl ? `=HYPERLINK("${personalUrl}","📁 File")` : '',
         P1_QR_TEXT        : qrUrl,
@@ -2182,6 +2302,18 @@ function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
   }
 }
 
+// Safe liveness/readiness payload for AI Studio and uptime monitors. It never
+// returns IDs, emails, secrets, sheet data or employee workload.
+function P1_PUBLIC_HEALTH_() {
+  const props=PropertiesService.getScriptProperties(),privacy=String(props.getProperty('PRIVACY_NOTICE_URL')||'').trim(),voice=String(props.getProperty('FREEPBX_WEBHOOK_URL')||'').trim();
+  return {ok:true,version:'V9.3.0-FAST',timestamp:new Date().toISOString(),deployed:!!P1_GET_EXEC_URL_(),aiConfigured:[DC_CFG.DEEPSEEK_KEY,DC_CFG.OPENAI_KEY,DC_CFG.GEMINI_KEY].some(Boolean),privacyConfigured:/^https:\/\//i.test(privacy),voiceConfigured:/^https:\/\//i.test(voice)&&!!props.getProperty('FREEPBX_API_TOKEN')};
+}
+
+function fixIndividualStaff(empCodeOrSheet, empCodeArg) {
+  if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required');
+  return fixIndividualStaff_(empCodeOrSheet,empCodeArg);
+}
+
 /* ================================================================
    SECTION 24 — BULBHUL AVATAR / HI SYSTEM
    Each employee (HI) gets:
@@ -2204,7 +2336,7 @@ const AVATAR_SOCIAL_COLS_ = [
 
 /* ── Role-based HI greeting (shown on personal website) ── */
 const HI_GREETINGS_ = {
-  'MD'           : n=>`Namaste! Main ${n} hoon — MD, Divyanshi Capital. Loan, team, aur growth — sab meri zimmedaari hai. Bulbhul AI mera partner hai.`,
+  'MD'           : n=>`Namaste! Main ${n} hoon — MD, Divyanshi Capital. Loan, team, aur growth — sab meri zimmedaari hai. Divyanshi Assistant mera partner hai.`,
   'FOUNDER'      : n=>`Hello! Main ${n} hoon — Founder, Divyanshi Capital. Loan solutions aur fintech innovation meri passion hai.`,
   'SALES MEMBER' : n=>`Hi! Main ${n} hoon — aapka Personal Loan Expert. PL, BL, HL, LAP, Auto — sab ke liye trusted guide hoon. Chalein shuru karte hain!`,
   'SALES MANAGER': n=>`Namaste! Main ${n} hoon — Sales Manager. Meri team ke saath hum aapko best deal dilaate hain.`,
@@ -2308,13 +2440,16 @@ function P1_GET_AVATAR_PROFILE_(empCode) {
         `#DivyanshiCapital #${String(p.name).replace(/\s+/g,'')} #Loan`
     }));
 
-    // Hands-free voice data for client
+    // Hands-free voice data uses the employee's real assigned workload only.
+    const latestLead=myLeads.slice().sort((a,b)=>new Date(b.LAST_UPDATED||b.TIMESTAMP||0)-new Date(a.LAST_UPDATED||a.TIMESTAMP||0))[0]||null;
+    const breachedLead=myLeads.find(r=>/BREACH|OVERDUE|DELAY/.test(String(r.TAT_STATUS||'').toUpperCase()))||null;
+    const completedTarget=Number(emp.TARGET||0);
     const voiceData = {
-      greeting  : `Namaste ${emp.NAME}! Main Bulbhul hoon, aapka AI partner. Aaj ${myLeads.length} total leads hain, ${open} open hain.`,
-      newLead   : GET_VOICE_NOTIFICATION_('NEW_LEAD',   {CLIENT_NAME:'sample client',LOAN_TYPE:'Personal Loan',REQUIRED_LOAN_AMOUNT:500000,PREFERRED_BANK:'HDFC',LEAD_ID:'L1234',TAT_DAYS:3}),
-      disbursal : GET_VOICE_NOTIFICATION_('DISBURSAL',  {CLIENT_NAME:'sample client',REQUIRED_LOAN_AMOUNT:500000,PREFERRED_BANK:'HDFC'}),
-      tatBreach : GET_VOICE_NOTIFICATION_('TAT_BREACH', {LEAD_ID:'L1234',DAYS:5}),
-      target    : GET_VOICE_NOTIFICATION_('TARGET',     {achieved:8,target:10})
+      greeting  : `Namaste ${emp.NAME}! Main Divyanshi Assistant hoon, aapka AI partner. Aaj ${myLeads.length} total leads hain, ${open} open hain.`,
+      newLead   : latestLead?GET_VOICE_NOTIFICATION_('NEW_LEAD',latestLead):'',
+      disbursal : latestLead&&/DISBURS/.test(String(latestLead.CASE_CATEGORY||'').toUpperCase())?GET_VOICE_NOTIFICATION_('DISBURSAL',latestLead):'',
+      tatBreach : breachedLead?GET_VOICE_NOTIFICATION_('TAT_BREACH',breachedLead):'',
+      target    : completedTarget?GET_VOICE_NOTIFICATION_('TARGET',{achieved:approved,target:completedTarget}):''
     };
 
     return {
@@ -2337,39 +2472,6 @@ function P1_GET_AVATAR_PROFILE_(empCode) {
       voiceData
     };
   } catch(err){ LOG_ERR_('P1_GET_AVATAR_PROFILE',empCode,err.message); return {ok:false,err:err.message}; }
-}
-
-/* ── Public employee mini-site data. Keep this separate from staff operational data. ── */
-function P1_GET_PUBLIC_CARD_PROFILE_(empCode) {
-  try {
-    empCode=String(empCode||'').trim().toUpperCase();
-    const emp=FIND_EMPLOYEE_FULL_(empCode); if(!emp)return null;
-    const base=P1_GET_EXEC_URL_(), e=encodeURIComponent(empCode);
-    const name=String(emp.NAME||empCode).trim(), role=String(emp.ROLE||'Loan Advisor').trim();
-    const greeting=String(emp.AVATAR_GREETING||emp.GREETING||`Namaste! Main ${name} hoon — Divyanshi Capital mein aapka dedicated loan advisor.`).trim();
-    const tagline=String(emp.AVATAR_TAGLINE||`${role} — Divyanshi Capital`).trim();
-    return {
-      ok:true, empCode, name, role, dept:String(emp.DEPARTMENT||'').trim(),
-      mobile:String(emp.MOBILE||'').trim(), whatsapp:String(emp.WHATSAPP||emp.MOBILE||'').trim(),
-      email:String(emp.EMAIL||'').trim(), tgChatId:String(emp.TG_USERNAME||'').replace(/^@/,''),
-      profilePic:String(emp.PROFILE_PIC||`https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=d4af37&color=0a2540&size=200`).trim(),
-      greeting, tagline, bot:P1_EMPLOYEE_PERSONA_(emp), companyUrl:'https://www.divyanshicapital.com',
-      formLink:`${base}?page=form&emp=${e}&source=employee_card`
-    };
-  } catch(e){ LOG_ERR_('P1_GET_PUBLIC_CARD_PROFILE',empCode,e.message); return null; }
-}
-
-/* Public card chat is advisory-only: it never reads CRM, identifies cases, or executes commands. */
-function P1_PUBLIC_CARD_CHAT(payload) {
-  payload=payload||{};
-  const message=String(payload.message||'').trim().slice(0,700);
-  const emp=P1_GET_PUBLIC_CARD_PROFILE_(payload.empCode);
-  if(!message)return {ok:false,err:'Please enter a question.'};
-  const advisor=emp?`${emp.name}, ${emp.role}`:'a Divyanshi Capital team member';
-  const persona=emp&&emp.bot?emp.bot:{title:'Divyanshi Capital Assistant',greeting:'Namaste! How can I help?',instruction:'You support general public questions only.'};
-  const products=GET_ACTIVE_LOAN_PRODUCTS_().map(p=>p.name).slice(0,8).join(', ');
-  const system='You are Bulbhul, the public assistant for '+advisor+' at Divyanshi Capital. '+persona.instruction+' Mirror the visitor\'s language (Hindi, English, or Hinglish), be warm and professional, and keep normal replies under 90 words. Available lending products: '+products+'. Never access case records, request sensitive identity numbers, OTPs, passwords, PINs, card data, or banking credentials. Never take operational actions.';
-  return {ok:true,reply:MULTI_BRAIN_REPLY_(message,system)};
 }
 
 /* ── Loan post caption generator ── */
@@ -2472,339 +2574,317 @@ function INSTALL_AVATAR_SOCIAL_SCHEMA_() {
   return 'AVATAR_SCHEMA_OK';
 }
 
-
-/* ================================================================
-   SECTION 25 — FRONTEND API SURFACE
-   Every function below is called directly via google.script.run from
-   index.html, smart_form.html, calling.html, or voice.html. Each one
-   exists because a specific client-side call site requires it —
-   see the html files' google.script.run chains for the call sites.
-   ================================================================ */
-
-/* ── Session tokens (ScriptCache-backed, 6h TTL — CacheService max) ── */
-function P1_MINT_ACCESS_TOKEN_(empCode) {
-  const token = Utilities.getUuid().replace(/-/g, '');
-  SC_.put('ACCESS_' + token, String(empCode || '').trim().toUpperCase(), 21600);
-  return token;
-}
-
-function P1_PIN_DIGEST_(empCode, pin, salt) {
-  const material = [String(empCode || '').trim().toUpperCase(), String(salt || ''), String(pin || '')].join(':');
-  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, material, Utilities.Charset.UTF_8)
-    .map(function (byte) { return ('0' + (byte & 0xff).toString(16)).slice(-2); }).join('');
-}
-
-function P1_AUTH_FAILURE_KEY_(empCode) { return 'AUTH_FAIL_' + String(empCode || '').trim().toUpperCase(); }
-function P1_IS_AUTH_THROTTLED_(empCode) { return Number(SC_.get(P1_AUTH_FAILURE_KEY_(empCode)) || 0) >= 5; }
-function P1_RECORD_AUTH_FAILURE_(empCode) {
-  const key = P1_AUTH_FAILURE_KEY_(empCode);
-  const attempts = Number(SC_.get(key) || 0) + 1;
-  SC_.put(key, String(attempts), attempts >= 5 ? 900 : 900);
-}
-function P1_CLEAR_AUTH_FAILURES_(empCode) { SC_.remove(P1_AUTH_FAILURE_KEY_(empCode)); }
-
-function P1_PASSWORD_MATCHES_(emp, password) {
-  const props=PropertiesService.getScriptProperties();
-  const hashKey='PIN_HASH_'+emp.EMP_CODE, saltKey='PIN_SALT_'+emp.EMP_CODE;
-  const storedHash=String(props.getProperty(hashKey)||''), legacy=String(props.getProperty('PIN_'+emp.EMP_CODE)||'');
-  if(storedHash) return P1_PIN_DIGEST_(emp.EMP_CODE,password,props.getProperty(saltKey))===storedHash;
-  // Migrate the pre-existing HR-managed credential on first successful use.
-  if(!legacy || password!==legacy)return false;
-  const salt=Utilities.getUuid();
-  props.setProperties({[hashKey]:P1_PIN_DIGEST_(emp.EMP_CODE,password,salt),[saltKey]:salt});
-  props.deleteProperty('PIN_'+emp.EMP_CODE);
-  return true;
-}
-function P1_VALIDATE_ACCESS_(empCode, token) {
-  try {
-    const code = String(empCode || '').trim().toUpperCase();
-    const t = String(token || '').trim();
-    if (!code || !t) return false;
-    return SC_.get('ACCESS_' + t) === code;
-  } catch (_) { return false; }
-}
-
-/* ── index.html: callGAS('P1_VERIFY_EMP', {empCode,pin}) — staff login on the personal card page ── */
-function P1_VERIFY_EMP(payload) {
-  payload = payload || {};
-  const emp = FIND_EMPLOYEE_FULL_(String(payload.empCode || '').toUpperCase());
-  if (!emp) return { ok: false, err: 'Invalid employee code or PIN' };
-  if (P1_IS_AUTH_THROTTLED_(emp.EMP_CODE)) return { ok: false, err: 'Too many attempts. Please wait 15 minutes and try again.' };
-  const pin = String(payload.pin || '').trim();
-  const valid = !!pin && P1_PASSWORD_MATCHES_(emp,pin);
-  if (!valid) {
-    P1_RECORD_AUTH_FAILURE_(emp.EMP_CODE);
-    return { ok: false, err: 'Invalid employee code or PIN' };
-  }
-  P1_CLEAR_AUTH_FAILURES_(emp.EMP_CODE);
-  return { ok: true, empCode: emp.EMP_CODE, name: emp.NAME, role: emp.ROLE, accessToken: P1_MINT_ACCESS_TOKEN_(emp.EMP_CODE), err: '' };
-}
-
-function P1_CHANGE_EMP_PASSWORD(payload) {
+function P1_REQUIRE_API_ACTOR_(payload){
   payload=payload||{};
-  const emp=FIND_EMPLOYEE_FULL_(String(payload.empCode||'').trim().toUpperCase());
-  const current=String(payload.currentPassword||'').trim(), next=String(payload.newPassword||'');
-  if(!emp) return {ok:false,err:'Invalid employee code or password.'};
-  if(P1_IS_AUTH_THROTTLED_(emp.EMP_CODE)) return {ok:false,err:'Too many attempts. Please wait 15 minutes and try again.'};
-  if(next.length<8||next.length>64) return {ok:false,err:'New password must be 8–64 characters.'};
-  if(!current||!P1_PASSWORD_MATCHES_(emp,current)){P1_RECORD_AUTH_FAILURE_(emp.EMP_CODE);return {ok:false,err:'Invalid employee code or password.'};}
-  if(current===next) return {ok:false,err:'Choose a different new password.'};
-  const props=PropertiesService.getScriptProperties(),salt=Utilities.getUuid();
-  props.setProperties({['PIN_HASH_'+emp.EMP_CODE]:P1_PIN_DIGEST_(emp.EMP_CODE,next,salt),['PIN_SALT_'+emp.EMP_CODE]:salt});
-  props.deleteProperty('PIN_'+emp.EMP_CODE); P1_CLEAR_AUTH_FAILURES_(emp.EMP_CODE);
-  if(payload.accessToken) SC_.remove('ACCESS_'+String(payload.accessToken).trim());
-  return {ok:true,message:'Password changed. Please sign in again.'};
+  const code=String(payload.actorEmpCode||payload.empCode||'').trim().toUpperCase(),token=String(payload.accessToken||payload.access_token||'').trim();
+  if(!code||!P1_VALIDATE_ACCESS_TOKEN_(code,token))return null;
+  return FIND_EMPLOYEE_FULL_(code);
 }
 
-/* ── index.html: callGAS('get_boot_data', {empCode,page}) ── */
-function get_boot_data(payload) {
-  payload = payload || {};
-  const emp  = String(payload.empCode || '').trim().toUpperCase();
-  const page = String(payload.page || 'home').trim().toLowerCase();
-  return {
-    baseUrl: P1_GET_EXEC_URL_(),
-    page: page,
-    emp: emp,
-    products: GET_ACTIVE_LOAN_PRODUCTS_(),
-    banks: P1_GET_BANK_OPTIONS_MAP_(),
-    staff: emp ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
-    avatar: (page === 'card' && emp) ? P1_GET_PUBLIC_CARD_PROFILE_(emp) : null,
-    dashboard: (page === 'dashboard' && emp && P1_VALIDATE_ACCESS_(emp, payload.accessToken)) ? P1_GET_STAFF_DASHBOARD_DATA_(emp) : null
-  };
+function P1_ACTIVE_ADMIN_(){
+  try{const email=DC_CLEAN_EMAIL_(Session.getActiveUser().getEmail());if(!email)return false;const emp=FIND_EMPLOYEE_FULL_(email);return !!(emp&&P1_HAS_MASTER_ACCESS_(emp))||email===DC_CFG.COMPANY.MD_EMAIL||email===DC_CFG.COMPANY.FOUNDER_EMAIL;}catch(_){return false;}
 }
 
-/* ── index.html: callGAS('MLA_LOG_ACTIVITY', {type,empCode,amount}) ── */
-function MLA_LOG_ACTIVITY(payload) {
-  try {
-    payload = payload || {};
-    const sh = GET_OR_CREATE_('ACTIVITY_LOG');
-    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'TYPE', 'EMP_CODE', 'DETAILS']);
-    sh.appendRow([new Date(), String(payload.type || ''), String(payload.empCode || '').trim().toUpperCase(), JSON.stringify(payload).slice(0, 500)]);
-    return { ok: true };
-  } catch (e) { LOG_ERR_('MLA_LOG_ACTIVITY', '', e.message); return { ok: false, err: e.message }; }
+function SYNC_SOURCE_NAME_MASTER_(){
+  const sh=GET_OR_CREATE_('SOURCE_NAME'),h=P1_ENSURE_HEADERS_(sh,P1_TAB_MAP.SOURCE_NAME());
+  const rows=[
+    ['Sales Team','SALES','YES'],['Manual Calling','SALES','YES'],['AI Auto Calling','SALES','YES'],
+    ['WhatsApp','SALES','YES'],['Website','SALES','YES'],['Referral','SALES','YES'],['Walk-in','SALES','YES'],
+    ['Instagram','SALES','YES'],['Facebook','SALES','YES'],['LinkedIn','SALES','YES'],
+    ['Email Campaign','SALES','YES'],['Bank Referral','SALES','YES'],['GoDial Auto Calling','SALES','YES'],
+    ['DSA','LOGIN DEPARTMENT','YES'],['MIS UPDATE','REPORT','YES'],['NEW STAFF ENTRY','HR','YES'],
+    ['INTERVIEW ENTRY','HR','YES'],['BANKER ENTRY','LOGIN DEPARTMENT','YES'],
+    ['SEND TO LOGIN','LOGIN DEPARTMENT','YES'],['COMPLETED','LOGIN DEPARTMENT','YES'],['OTHER','HR','YES']
+  ];
+  if(sh.getLastRow()>1)sh.getRange(2,1,sh.getLastRow()-1,sh.getLastColumn()).clearContent();
+  sh.getRange(2,1,rows.length,h.length).setValues(rows.map(r=>P1_BUILD_ROW_(h,{SOURCE_NAME:r[0],DATA_FLOW:r[1],ACTIVE:r[2]})));
+  SC_.remove('SRC_ROUTING_V1');ROUTING_CACHE_=null;
+  return 'SOURCE_NAME_SYNCED';
 }
 
-/* ── index.html: callGAS('DC_TG_BROADCAST', msg) ── */
-function DC_TG_BROADCAST(msg) {
-  try {
-    const sent = DC_SEND_TG_(String(msg || '').slice(0, 4000));
-    return sent ? 'Broadcast sent!' : 'No Telegram recipients configured yet.';
-  } catch (e) { LOG_ERR_('DC_TG_BROADCAST', '', e.message); return 'Broadcast failed: ' + e.message; }
+function P1_CALLING_CAN_ACCESS_(emp,lead){
+  if(!emp||!lead)return false;
+  if(P1_HAS_MASTER_ACCESS_(emp))return true;
+  const work=(String(emp.ROLE||'')+' '+String(emp.DEPARTMENT||'')).toUpperCase();
+  if(!/SALES|CALL|RELATIONSHIP|LOGIN|COORDINATOR|MANAGER|HEAD/.test(work))return false;
+  const ownerCode=String(lead.EMP_CODE||'').toUpperCase();if(!ownerCode)return false;
+  const owner=FIND_EMPLOYEE_FULL_(ownerCode);return owner?P1_CAN_SEE_EMP_(emp,owner):ownerCode===emp.EMP_CODE;
 }
 
-/* ── smart_form.html: consent links + version shown on the intake form ── */
-function P1_GET_HR_PUBLIC_CONFIG() {
-  const p = PropertiesService.getScriptProperties();
-  return {
-    tcUrl: p.getProperty('TC_URL') || 'https://www.divyanshicapital.com/shop/terms-conditions/',
-    privacyUrl: p.getProperty('PRIVACY_URL') || 'https://www.divyanshicapital.com/privacy-policy/',
-    consentVersion: p.getProperty('CONSENT_VERSION') || 'v1'
-  };
+function P1_B64URL_(bytes){return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/,'');}
+function P1_CONST_EQ_(a,b){a=String(a||'');b=String(b||'');if(!a||a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
+function P1_HASH_SECRET_(secret,salt){let value=String(salt||'')+'|'+String(secret||'');for(let i=0;i<500;i++)value=P1_B64URL_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,value,Utilities.Charset.UTF_8));return value;}
+function P1_AUTH_VERSION_(empCode){return Number(PropertiesService.getScriptProperties().getProperty('AUTH_VERSION_'+String(empCode||'').toUpperCase())||1);}
+function P1_BUMP_AUTH_VERSION_(empCode){const p=PropertiesService.getScriptProperties(),key='AUTH_VERSION_'+String(empCode||'').toUpperCase(),next=P1_AUTH_VERSION_(empCode)+1;p.setProperty(key,String(next));return next;}
+function P1_STORE_PIN_HASH_(empCode,pin){const code=String(empCode||'').toUpperCase(),p=PropertiesService.getScriptProperties(),salt=Utilities.getUuid().replace(/-/g,'');p.setProperties({['PIN_SALT_'+code]:salt,['PIN_HASH_'+code]:P1_HASH_SECRET_(pin,salt)});p.deleteProperty('PIN_'+code);}
+function P1_VERIFY_PIN_(empCode,pin){
+  const code=String(empCode||'').toUpperCase(),entered=String(pin||''),p=PropertiesService.getScriptProperties(),salt=p.getProperty('PIN_SALT_'+code)||'',hash=p.getProperty('PIN_HASH_'+code)||'';
+  if(salt&&hash)return P1_CONST_EQ_(hash,P1_HASH_SECRET_(entered,salt));
+  // One-time migration is allowed only from an employee-specific legacy PIN.
+  // Shared/default credentials must never authenticate an employee.
+  const legacy=p.getProperty('PIN_'+code)||'';
+  if(legacy&&P1_CONST_EQ_(legacy,entered)){P1_STORE_PIN_HASH_(code,entered);return true;}
+  return false;
+}
+function P1_ISSUE_ACCESS_TOKEN_(empCode){const code=String(empCode||'').toUpperCase(),token=Utilities.getUuid().replace(/-/g,'');CacheService.getScriptCache().put('P1_ACCESS_'+token,JSON.stringify({emp:code,version:P1_AUTH_VERSION_(code),issuedAt:Date.now()}),1800);return token;}
+function P1_VALIDATE_ACCESS_TOKEN_(empCode,token){
+  const code=String(empCode||'').trim().toUpperCase();token=String(token||'').trim();if(!code||!token)return false;
+  try{const raw=CacheService.getScriptCache().get('P1_ACCESS_'+token),meta=raw?JSON.parse(raw):null;return!!meta&&meta.emp===code&&Number(meta.version)===P1_AUTH_VERSION_(code)&&!!FIND_EMPLOYEE_FULL_(code);}catch(_){return false;}
+}
+function P1_REVOKE_ACCESS_TOKEN_(token){token=String(token||'').trim();if(token)CacheService.getScriptCache().remove('P1_ACCESS_'+token);}
+function P1_CAN_ACT_FOR_(actor,targetCode){const target=FIND_EMPLOYEE_FULL_(String(targetCode||'').toUpperCase());return!!target&&P1_CAN_SEE_EMP_(actor,target);}
+function P1_CHANGE_PIN(empCode,accessToken,currentPin,newPin){
+  const code=String(empCode||'').trim().toUpperCase();if(!P1_VALIDATE_ACCESS_TOKEN_(code,accessToken))return{ok:false,err:'Employee session expired'};
+  if(!P1_VERIFY_PIN_(code,currentPin))return{ok:false,err:'Current PIN is incorrect'};
+  if(!/^\d{6,12}$/.test(String(newPin||'')))return{ok:false,err:'New PIN must be 6 to 12 digits'};
+  P1_STORE_PIN_HASH_(code,String(newPin));P1_BUMP_AUTH_VERSION_(code);P1_REVOKE_ACCESS_TOKEN_(accessToken);P1_LOG_AVATAR_ACTIVITY_(code,'SECURITY','PIN changed','SESSION_REVOKED',100);return{ok:true,msg:'PIN changed. Sign in again.'};
+}
+function P1_LOGOUT(empCode,accessToken){const valid=P1_VALIDATE_ACCESS_TOKEN_(empCode,accessToken);P1_REVOKE_ACCESS_TOKEN_(accessToken);return{ok:valid,msg:'Signed out'};}
+function P1_FORGOT_PIN(empCode,email){
+  const code=String(empCode||'').trim().toUpperCase(),mail=DC_CLEAN_EMAIL_(email),generic={ok:true,msg:'If the employee code and registered email match, a verification code has been sent.'},cache=CacheService.getScriptCache(),cool='P1_OTP_COOL_'+P1_IDEMPOTENCY_CACHE_KEY_(code+'|'+mail).replace('P1_SUBMIT_','');
+  if(cache.get(cool))return generic;cache.put(cool,'1',120);
+  const emp=FIND_EMPLOYEE_FULL_(code);if(!emp||!mail||mail!==DC_CLEAN_EMAIL_(emp.EMAIL))return generic;
+  const otp=String(Math.floor(100000+Math.random()*900000)),salt=Utilities.getUuid().replace(/-/g,''),key='P1_OTP_'+code;
+  cache.put(key,JSON.stringify({hash:P1_HASH_SECRET_(otp,salt),salt,attempts:0,version:P1_AUTH_VERSION_(code)}),600);
+  if(!P1_MAIL_QUOTA_(1,'PIN_RESET_OTP'))return generic;
+  MailApp.sendEmail({to:mail,subject:'Divyanshi Capital PIN reset verification',htmlBody:`<p>Your one-time verification code is <b>${otp}</b>.</p><p>It expires in 10 minutes. If you did not request this, contact HR immediately.</p>`});return generic;
+}
+function P1_VERIFY_OTP(empCode,otp){
+  const code=String(empCode||'').trim().toUpperCase(),cache=CacheService.getScriptCache(),key='P1_OTP_'+code,raw=cache.get(key);if(!raw)return{ok:false,err:'Verification code expired or invalid'};
+  try{const meta=JSON.parse(raw);if(Number(meta.attempts||0)>=5){cache.remove(key);return{ok:false,err:'Verification code expired or invalid'};}if(!P1_CONST_EQ_(meta.hash,P1_HASH_SECRET_(String(otp||''),meta.salt))){meta.attempts=Number(meta.attempts||0)+1;cache.put(key,JSON.stringify(meta),600);return{ok:false,err:'Verification code expired or invalid'};}cache.remove(key);const resetToken=Utilities.getUuid().replace(/-/g,'');cache.put('P1_RESET_'+resetToken,JSON.stringify({emp:code,version:meta.version}),600);return{ok:true,resetToken};}catch(_){cache.remove(key);return{ok:false,err:'Verification code expired or invalid'};}
+}
+function P1_RESET_PIN(empCode,resetToken,newPin){
+  const code=String(empCode||'').trim().toUpperCase(),token=String(resetToken||'').trim(),cache=CacheService.getScriptCache(),key='P1_RESET_'+token,raw=cache.get(key);cache.remove(key);
+  if(!raw||!/^\d{6,12}$/.test(String(newPin||'')))return{ok:false,err:'Reset session invalid or new PIN format is wrong'};
+  try{const meta=JSON.parse(raw);if(meta.emp!==code||Number(meta.version)!==P1_AUTH_VERSION_(code))return{ok:false,err:'Reset session expired'};P1_STORE_PIN_HASH_(code,String(newPin));P1_BUMP_AUTH_VERSION_(code);P1_LOG_AVATAR_ACTIVITY_(code,'SECURITY','PIN reset','ALL_SESSIONS_REVOKED',100);return{ok:true,msg:'PIN reset. Sign in with the new PIN.'};}catch(_){return{ok:false,err:'Reset session invalid'};}
 }
 
-/* ── smart_form.html: requestUploadToken() ── */
-function P1_ISSUE_UPLOAD_TOKEN(submissionKey, route) {
-  try {
-    const key = String(submissionKey || '').trim();
-    if (!key) throw new Error('submissionKey required');
-    const token = Utilities.getUuid().replace(/-/g, '');
-    SC_.put('UPLOAD_TOKEN_' + token, JSON.stringify({ key: key }), 900);
-    return token;
-  } catch (e) { LOG_ERR_('P1_ISSUE_UPLOAD_TOKEN', '', e.message); throw e; }
+function P1_GET_CALLING_QUEUE_(empCode,accessToken){
+  try{
+    if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,accessToken))return{ok:false,err:'Calling session expired. Verify EMP_CODE and PIN again.'};
+    const emp=FIND_EMPLOYEE_FULL_(String(empCode||'').trim().toUpperCase());if(!emp)return{ok:false,err:'Valid active employee required'};
+    const full=P1_HAS_MASTER_ACCESS_(emp),work=(String(emp.ROLE||'')+' '+String(emp.DEPARTMENT||'')).toUpperCase();
+    if(!full&&!/SALES|CALL|RELATIONSHIP|LOGIN|COORDINATOR|MANAGER|HEAD/.test(work))return{ok:false,err:'Calling is not assigned to this role'};
+    const complete={APPROVED:1,DISBURSED:1,DISBURSE:1,COMPLETED:1,CLOSED:1,REJECTED:1},all=GET_MASTER_SNAPSHOT_(),visible=all.filter(c=>P1_CALLING_CAN_ACCESS_(emp,c)),pending=visible.filter(c=>!complete[String(c.CASE_CATEGORY||'OPEN').toUpperCase()]);
+    const queue=pending.slice(0,200).map(c=>({leadId:c.LEAD_ID||'',name:c.CLIENT_NAME||'',mobile:DC_CLEAN_MOBILE_(c.CLIENT_MOBILE||''),type:c.LOAN_TYPE||'',amount:c.REQUIRED_LOAN_AMOUNT||0,bank:c.PREFERRED_BANK||'',status:String(c.CASE_CATEGORY||'OPEN').toUpperCase(),tatStatus:c.TAT_STATUS||'ACTIVE',docStatus:c.DOC_STATUS||''}));
+    const tz='Asia/Kolkata',today=Utilities.formatDate(new Date(),tz,'yyyy-MM-dd'),doneToday=P1_SHEET_OBJECTS_('AVATAR_ACTIVITY_LOG').filter(a=>String(a.EMP_CODE||'').toUpperCase()===emp.EMP_CODE&&String(a.ACTIVITY_TYPE||'').toUpperCase()==='CALL_DISPOSITION'&&Utilities.formatDate(new Date(a.TIMESTAMP||0),tz,'yyyy-MM-dd')===today).length,tatBreaches=pending.filter(c=>/BREACH|OVERDUE|DELAY/.test(String(c.TAT_STATUS||'').toUpperCase())).length,avatar=P1_MASTER_CONTROL_SNAPSHOT_(false).avatars.find(a=>a.EMP_CODE===emp.EMP_CODE);
+    return{ok:true,staff:{empCode:emp.EMP_CODE,name:emp.NAME,role:emp.ROLE,department:emp.DEPARTMENT},queue,stats:{pending:queue.length,doneToday,tatBreaches,tatHealth:queue.length?Math.max(0,Math.round((queue.length-tatBreaches)/queue.length*100)):100,performance:avatar?avatar.PERFORMANCE_PCT:0},aiAvailable:!!(DC_CFG.DEEPSEEK_KEY||DC_CFG.OPENAI_KEY||DC_CFG.GEMINI_KEY)};
+  }catch(e){LOG_ERR_('P1_GET_CALLING_QUEUE',empCode,e.message);return{ok:false,err:e.message};}
 }
 
-function P1_STORE_PUBLIC_FILES_(payload, leadId, files) {
-  const token=String(payload.upload_token||'').trim(), submissionKey=String(payload.submission_key||'').trim();
-  const cached=token?SC_.get('UPLOAD_TOKEN_'+token):'';
-  if(!cached) return {ok:false,err:'Upload session expired. Please select files and submit again.'};
-  let grant={}; try{grant=JSON.parse(cached);}catch(_){ }
-  if(!submissionKey || grant.key!==submissionKey) return {ok:false,err:'Upload session validation failed.'};
-  if(!leadId || files.length>3) return {ok:false,err:'A maximum of 3 documents can be uploaded.'};
-  const allowed={'application/pdf':true,'image/jpeg':true,'image/png':true}; let total=0;
-  const clean=[];
-  for(let i=0;i<files.length;i++){
-    const f=files[i]||{}, mime=String(f.mimeType||'').toLowerCase();
-    if(!allowed[mime]||!f.base64) return {ok:false,err:'Only PDF, JPG and PNG documents are accepted.'};
-    const bytes=Utilities.base64Decode(String(f.base64).split(',').pop());
-    if(bytes.length>2*1024*1024) return {ok:false,err:'Each document must be 2 MB or smaller.'};
-    total+=bytes.length; if(total>5*1024*1024) return {ok:false,err:'Total document upload must be 5 MB or smaller.'};
-    clean.push({bytes:bytes,mime:mime,name:String(f.name||('document_'+(i+1))).replace(/[^a-zA-Z0-9._ -]/g,'_').slice(0,100)});
-  }
-  const parentId=String(PropertiesService.getScriptProperties().getProperty('CLIENT_DOCS_FOLDER_ID')||'').trim();
-  if(!parentId) return {ok:false,err:'Document storage is not configured.'};
-  const parent=DriveApp.getFolderById(parentId), folder=parent.createFolder(String(leadId).replace(/[^a-zA-Z0-9_-]/g,'_'));
-  clean.forEach(f=>folder.createFile(Utilities.newBlob(f.bytes,f.mime,f.name)));
-  SC_.remove('UPLOAD_TOKEN_'+token);
-  return {ok:true,folderUrl:folder.getUrl()};
+function P1_CALLING_UPDATE_(data){
+  try{
+    data=data||{};const employeeCode=String(data.agent||data.empCode||'').trim().toUpperCase();if(!P1_VALIDATE_ACCESS_TOKEN_(employeeCode,data.accessToken))return{ok:false,err:'Calling session expired'};const emp=FIND_EMPLOYEE_FULL_(employeeCode);if(!emp)return{ok:false,err:'Valid active employee required'};
+    const query=String(data.leadId||data.mobile||data.query||'').trim(),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===query.toUpperCase()||DC_CLEAN_MOBILE_(c.CLIENT_MOBILE||'')===DC_CLEAN_MOBILE_(query));if(!lead)return{ok:false,err:'Assigned lead not found'};
+    if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'This case is not assigned to your role/team'};
+    const status=String(data.status||'').trim().toUpperCase(),allowed=['INTERESTED','CALLBACK','REJECTED','NO_ANSWER'];if(!allowed.includes(status))return{ok:false,err:'Invalid disposition'};
+    const result=UPDATE_LEAD_STATUS_(lead.LEAD_ID,status,String(data.remarks||'').trim());if(result.ok)P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'CALL_DISPOSITION',`${lead.LEAD_ID}|${status}`,'SAVED',100);SC_.remove('MASTER_CONTROL_V1');return result;
+  }catch(e){LOG_ERR_('P1_CALLING_UPDATE','',e.message);return{ok:false,err:e.message};}
 }
 
-/* ── smart_form.html: loadLoanData() ── */
-function P1_GET_LOAN_CATALOG() {
-  return { products: GET_ACTIVE_LOAN_PRODUCTS_(), banks: P1_GET_BANK_OPTIONS_MAP_() };
+function P1_CALLING_START_(data){
+  data=data||{};
+  const empCode=String(data.empCode||'').trim().toUpperCase();
+  const leadId=String(data.leadId||'').trim().toUpperCase();
+  if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,data.accessToken))return{ok:false,err:'Calling session expired'};
+  const emp=FIND_EMPLOYEE_FULL_(empCode),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId);
+  if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Calling access denied'};
+  const cache=CacheService.getScriptCache(),guardKey='CALL_START_'+emp.EMP_CODE+'_'+lead.LEAD_ID;
+  if(cache.get(guardKey))return{ok:true,duplicate:true};
+  cache.put(guardKey,'1',20);
+  P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'CALL_STARTED',lead.LEAD_ID,'DIALER_OPENED',0);
+  return{ok:true};
 }
 
-/* ── calling.html: initLead() ── */
-function P1_GET_CALLING_QUEUE(empCode, accessToken) {
-  try {
-    empCode = String(empCode || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(empCode, accessToken)) return { ok: false, err: 'Session expired. Re-open Calling from your dashboard.' };
-    const emp = FIND_EMPLOYEE_FULL_(empCode);
-    if (!emp) return { ok: false, err: 'Employee not found' };
-    const role = String(emp.ROLE || '').toUpperCase();
-    const isLead = ['MANAGER', 'MD', 'FOUNDER', 'ADMIN'].some(r => role.includes(r));
-    let data = GET_MASTER_SNAPSHOT_();
-    if (!isLead) data = data.filter(r => String(r.EMP_CODE || '').toUpperCase() === empCode);
-    const closedStates = ['DISBURSE', 'DISBURSED', 'REJECT', 'REJECTED', 'NOT INTERESTED', 'WRONG NUMBER'];
-    const open = data.filter(r => !closedStates.includes(String(r.CASE_CATEGORY || '').toUpperCase()));
-    const today = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd');
-    const doneToday = data.filter(r => {
-      try { return closedStates.includes(String(r.CASE_CATEGORY || '').toUpperCase()) && Utilities.formatDate(new Date(r.LAST_UPDATED || 0), 'Asia/Kolkata', 'yyyy-MM-dd') === today; }
-      catch (_) { return false; }
-    }).length;
-    const tatBreaches = data.filter(r => {
-      const cat = String(r.CASE_CATEGORY || '').toUpperCase();
-      if (closedStates.includes(cat)) return false;
-      return String(r.TAT_STATUS || '').toUpperCase() === 'TAT_BREACHED' || (r.TAT_DEADLINE && new Date(r.TAT_DEADLINE) < new Date());
-    }).length;
-    const queue = open.slice(0, 100).map(r => ({
-      leadId: r.LEAD_ID || '', clientName: r.CLIENT_NAME || '', mobile: r.CLIENT_MOBILE || '',
-      name:r.CLIENT_NAME || '', type:r.LOAN_TYPE || '', loanType: r.LOAN_TYPE || '', amount: r.REQUIRED_LOAN_AMOUNT || '', bank: r.PREFERRED_BANK || '',
-      status: r.CASE_CATEGORY || 'OPEN', remarks: r.REMARKS || '', tatStatus: r.TAT_STATUS || 'ACTIVE', empCode: r.EMP_CODE || ''
-    }));
-    const aiAvailable = !!(DC_CFG.DEEPSEEK_KEY || DC_CFG.OPENAI_KEY || DC_CFG.GEMINI_KEY);
-    const pending = open.length;
-    const performance = data.length ? Math.round(((data.length - pending) / data.length) * 100) : 0;
-    const tatHealth = data.length ? Math.round(((data.length - tatBreaches) / data.length) * 100) : 100;
-    return { ok: true, queue, stats: { pending, doneToday, tatBreaches, tatHealth, performance }, aiAvailable };
-  } catch (e) { LOG_ERR_('P1_GET_CALLING_QUEUE', empCode, e.message); return { ok: false, err: e.message }; }
+function P1_CALLING_AI_REMARK_(data){
+  try{
+    data=data||{};
+    const empCode=String(data.empCode||'').trim().toUpperCase();
+    const leadId=String(data.leadId||'').trim().toUpperCase();
+    if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,data.accessToken))return{ok:false,err:'Calling session expired'};
+    const emp=FIND_EMPLOYEE_FULL_(empCode),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId);
+    if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Case access denied'};
+    const fallback=`Follow up on ${lead.LOAN_TYPE||'loan'} requirement. Confirm current interest, pending documents, preferred bank and next callback time.`;
+    const cacheKey='CALLING_AI_REMARK_' + empCode + '_' + leadId;
+    const cached=SC_.get(cacheKey);
+    if(cached) return {ok:true,remark:String(cached).slice(0,500),mode:'CACHE'};
+    if(THROTTLE_ONCE_('CALLING_AI_THROTTLE_' + empCode + '_' + leadId, 12)) return {ok:true,remark:fallback,mode:'THROTTLED'};
+    if(!(DC_CFG.DEEPSEEK_KEY||DC_CFG.OPENAI_KEY||DC_CFG.GEMINI_KEY))return{ok:true,remark:fallback,mode:'RULES'};
+    const prompt='Create one short factual call-note suggestion from these redacted case facts:\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,status:lead.CASE_CATEGORY,tat:lead.TAT_STATUS,docStatus:lead.DOC_STATUS,amount:lead.REQUIRED_LOAN_AMOUNT});
+    const remark=MULTI_BRAIN_REPLY_(prompt,'You assist an authorised loan calling employee. Suggest only; do not claim a call happened or documents were verified. No commands, no personal data.',160);
+    SC_.put(cacheKey,String(remark||fallback).slice(0,500),600);
+    return{ok:true,remark:String(remark||fallback).slice(0,500),mode:'AI'};
+  }catch(e){LOG_ERR_('P1_CALLING_AI_REMARK','',e.message);return{ok:false,err:e.message};}
 }
 
-function P1_CASE_FOR_EMPLOYEE_(empCode, leadId) {
-  const code=String(empCode||'').trim().toUpperCase(), id=String(leadId||'').trim().toUpperCase();
-  const emp=FIND_EMPLOYEE_FULL_(code); if(!emp||!id)return null;
-  const role=String(emp.ROLE||'').toUpperCase(), dept=String(emp.DEPARTMENT||'').toUpperCase();
-  const lead=GET_MASTER_SNAPSHOT_().find(r=>String(r.LEAD_ID||'').trim().toUpperCase()===id); if(!lead)return null;
-  if(['MD','FOUNDER','ADMIN','DIRECTOR'].some(r=>role.includes(r))||dept.includes('MANAGEMENT'))return lead;
-  if(String(lead.EMP_CODE||'').trim().toUpperCase()===code)return lead;
-  if(String(lead.MANAGER_EMAIL||'').trim().toLowerCase()===String(emp.EMAIL||'').trim().toLowerCase())return lead;
-  return null;
+function P1_PROCESS_VOICE_COMMAND_(data){
+  try{
+    data=data||{};const empCode=String(data.empCode||'').trim().toUpperCase();if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,data.accessToken))return{ok:false,err:'Voice session expired. Verify EMP_CODE and PIN again.'};
+    const emp=FIND_EMPLOYEE_FULL_(empCode),mobile=DC_CLEAN_MOBILE_(data.mobile||''),leadId=String(data.leadId||'').trim().toUpperCase();if(!emp||!mobile)return{ok:false,err:'Valid employee and 10-digit mobile required'};
+    const lead=GET_MASTER_SNAPSHOT_().find(c=>(!leadId||String(c.LEAD_ID||'').toUpperCase()===leadId)&&DC_CLEAN_MOBILE_(c.CLIENT_MOBILE||'')===mobile);if(!lead)return{ok:false,err:'Mobile is not present in an assigned case'};
+    if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'This client is not assigned to your role/team'};
+    const cache=CacheService.getScriptCache(),cooldown='VOICE_CALL_'+empCode+'_'+String(lead.LEAD_ID||mobile).replace(/[^A-Z0-9]/gi,'');if(cache.get(cooldown))return{ok:false,err:'Call request already sent. Wait one minute before retrying.'};
+    const props=PropertiesService.getScriptProperties(),url=String(props.getProperty('FREEPBX_WEBHOOK_URL')||'').trim(),token=String(props.getProperty('FREEPBX_API_TOKEN')||'').trim();if(!/^https:\/\//i.test(url)||!token)return{ok:false,err:'FreePBX bridge is not configured by the administrator'};
+    cache.put(cooldown,'1',60);
+    const response=UrlFetchApp.fetch(url,{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+token},muteHttpExceptions:true,payload:JSON.stringify({mobile:'+91'+mobile,leadId:lead.LEAD_ID||'',empCode:emp.EMP_CODE,loanType:lead.LOAN_TYPE||'',preferredBank:lead.PREFERRED_BANK||'',source:'DIVYANSHI_BULBHUL_VOICE'})});
+    const code=response.getResponseCode();if(code<200||code>=300){cache.remove(cooldown);LOG_ERR_('FREEPBX_VOICE',empCode,'HTTP '+code);return{ok:false,err:'Voice bridge rejected the request (HTTP '+code+')'};}
+    P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'AI_VOICE_CALL',String(lead.LEAD_ID||mobile),'REQUEST_ACCEPTED',100);return{ok:true,message:`Assigned case ${lead.LEAD_ID||''} sent to the voice bridge`};
+  }catch(e){LOG_ERR_('P1_PROCESS_VOICE_COMMAND','',e.message);return{ok:false,err:e.message};}
 }
 
-/* ── calling.html: AI-suggested disposition remark ── */
-function P1_CALLING_AI_REMARK(payload) {
-  payload = payload || {};
-  try {
-    const empCode = String(payload.empCode || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(empCode, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const leadId = String(payload.leadId || '').trim().toUpperCase();
-    const lead = P1_CASE_FOR_EMPLOYEE_(empCode,leadId);
-    if (!lead) return { ok: false, err: 'Lead not found' };
-    const sys = BULBHUL_SYS_BASE_ + '\n\nTask: Suggest one short, professional call-disposition remark (1-2 sentences, Hinglish) based on the case snapshot below. Reply with the remark only, no preamble.';
-    const prompt = '[CASE]\n' + JSON.stringify({ client: lead.CLIENT_NAME, loan: lead.LOAN_TYPE, bank: lead.PREFERRED_BANK, status: lead.CASE_CATEGORY, remarks: lead.REMARKS }, null, 2);
-    const remark = MULTI_BRAIN_REPLY_(prompt, sys);
-    return { ok: true, remark: String(remark || '').slice(0, 300) };
-  } catch (e) { LOG_ERR_('P1_CALLING_AI_REMARK', payload.empCode, e.message); return { ok: false, err: e.message }; }
-}
+function P1_GET_CALLING_QUEUE(empCode,accessToken){return P1_GET_CALLING_QUEUE_(empCode,accessToken);}
+function P1_CALLING_UPDATE(data){return P1_CALLING_UPDATE_(data);}
+function P1_CALLING_START(data){return P1_CALLING_START_(data);}
+function P1_CALLING_AI_REMARK(data){return P1_CALLING_AI_REMARK_(data);}
+function P1_PROCESS_VOICE_COMMAND(data){return P1_PROCESS_VOICE_COMMAND_(data);}
+function processVoiceCommand(data){return P1_PROCESS_VOICE_COMMAND_(typeof data==='string'?{mobile:data}:data);}
+function MLA_UPDATE_MINI_STATUS(data){return P1_CALLING_UPDATE_(data);}
 
-/* ── calling.html: disposition save (submitDisposition / closeNotesModal flow) ── */
-function P1_CALLING_UPDATE(payload) {
-  payload = payload || {};
-  try {
-    const agent = String(payload.agent || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(agent, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const lead=P1_CASE_FOR_EMPLOYEE_(agent,payload.leadId);
-    if(!lead) return {ok:false,err:'This case is not assigned to your account.'};
-    const res = UPDATE_LEAD_STATUS_(lead.LEAD_ID, payload.status, payload.remarks);
-    if (res.ok) {
-      try { RECORD_TASK_FOR_ATTENDANCE_(agent); } catch (_) {}
-      const sh = GET_OR_CREATE_('CALL_LOG');
-      P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'MOBILE', 'STATUS', 'REMARKS', 'DURATION_SEC']);
-      sh.appendRow([new Date(), agent, payload.leadId || '', payload.mobile || '', payload.status || '', String(payload.remarks || '').slice(0, 300), Number(payload.durationSec || 0)]);
-    }
-    return res;
-  } catch (e) { LOG_ERR_('P1_CALLING_UPDATE', payload.agent, e.message); return { ok: false, err: e.message }; }
-}
-
-/* ── calling.html: initiateCall() fire-and-forget call-start log ── */
-function P1_CALLING_START(payload) {
-  payload = payload || {};
-  try {
-    const code = String(payload.empCode || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const lead=P1_CASE_FOR_EMPLOYEE_(code,payload.leadId);
-    if(!lead)return {ok:false,err:'This case is not assigned to your account.'};
-    const sh = GET_OR_CREATE_('CALL_LOG');
-    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'MOBILE', 'STATUS', 'REMARKS', 'DURATION_SEC']);
-    sh.appendRow([new Date(), code, String(lead.LEAD_ID || '').trim(), '', 'DIAL_ATTEMPTED', '', 0]);
-    return { ok: true };
-  } catch (e) { LOG_ERR_('P1_CALLING_START', '', e.message); return { ok: false, err: e.message }; }
-}
-
-/* ── calling.html: p1SaveCaseFiles() ── */
-function P1_MINI_CRM_UPLOAD(payload) {
-  payload = payload || {};
-  try {
-    const code = String(payload.empCode || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const leadId = String(payload.leadId || '').trim();
-    const files = Array.isArray(payload.files) ? payload.files : [];
-    if (!leadId) return { ok: false, err: 'leadId required' };
-    if (!P1_CASE_FOR_EMPLOYEE_(code,leadId)) return {ok:false,err:'This case is not assigned to your account.'};
-    if (!files.length) return { ok: true, skipped: true };
-
-    const parentId = PropertiesService.getScriptProperties().getProperty('CLIENT_DOCS_FOLDER_ID');
-    if (!parentId) return { ok: false, err: 'CLIENT_DOCS_FOLDER_ID not configured' };
-    const parent = DriveApp.getFolderById(parentId);
-    const existing = parent.getFoldersByName(leadId);
-    const folder = existing.hasNext() ? existing.next() : parent.createFolder(leadId);
-
-    const links = [];
-    files.forEach(f => {
-      if (!f || !f.base64) return;
-      const bytes = Utilities.base64Decode(String(f.base64).split(',').pop());
-      const blob = Utilities.newBlob(bytes, f.mimeType || 'application/octet-stream', f.name || ('file_' + Date.now()));
-      links.push(folder.createFile(blob).getUrl());
-    });
-
-    const sh = GET_OR_CREATE_('CASE_FILES_LOG');
-    P1_ENSURE_HEADERS_(sh, ['TIMESTAMP', 'EMP_CODE', 'LEAD_ID', 'REMARKS', 'FILE_LINKS']);
-    sh.appendRow([new Date(), code, leadId, String(payload.remarks || ''), links.join(', ')]);
-
-    try {
-      const master = SHEET_('MASTER_DATA');
-      if (master && master.getLastRow() >= 2) {
-        const h = master.getRange(1, 1, 1, master.getLastColumn()).getValues()[0].map(DC_NORM_);
-        const li = h.indexOf('LEAD_ID'), di = h.indexOf('DOCS_LINK');
-        if (li > -1 && di > -1) {
-          const ids = master.getRange(2, li + 1, master.getLastRow() - 1, 1).getValues();
-          for (let i = 0; i < ids.length; i++) {
-            if (String(ids[i][0] || '').trim().toUpperCase() === leadId.toUpperCase()) {
-              master.getRange(i + 2, di + 1).setValue(folder.getUrl());
-              break;
-            }
-          }
-        }
+function P1_MINI_CRM_UPLOAD_(data){
+  try{
+    data=data||{};
+    const employeeCode=String(data.empCode||'').trim().toUpperCase();
+    if(!P1_VALIDATE_ACCESS_TOKEN_(employeeCode,data.accessToken))return{ok:false,err:'Calling session expired'};
+    const emp=FIND_EMPLOYEE_FULL_(employeeCode);if(!emp)return{ok:false,err:'Valid active employee required'};
+    const leadId=String(data.leadId||'').trim();
+    const lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId.toUpperCase());
+    if(!lead)return{ok:false,err:'Assigned lead not found'};
+    if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'This case is not assigned to your role/team'};
+    const upload=P1_SAVE_CLIENT_DOCS_(data,leadId);
+    if(!upload.names||!upload.names.length)return{ok:true,skipped:true};
+    const sh=SHEET_('MASTER_DATA');if(!sh||sh.getLastRow()<2)return{ok:false,err:'MASTER_DATA not found'};
+    const h=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(DC_NORM_);
+    const iL=h.indexOf('LEAD_ID'),iD=h.indexOf('DOCS_LINK'),iR=h.indexOf('REMARKS'),iU=h.indexOf('LAST_UPDATED');
+    const vals=sh.getRange(2,1,sh.getLastRow()-1,h.length).getValues();
+    for(let i=0;i<vals.length;i++){
+      if(String(vals[i][iL]||'').trim().toUpperCase()===leadId.toUpperCase()){
+        const row=i+2;
+        if(iD>-1)sh.getRange(row,iD+1).setValue(upload.folderUrl||'');
+        if(iR>-1&&data.remarks){const old=String(sh.getRange(row,iR+1).getValue()||'').trim();const add=String(data.remarks).trim();sh.getRange(row,iR+1).setValue(old?old+' | '+add:add);}
+        if(iU>-1)sh.getRange(row,iU+1).setValue(new Date());
+        break;
       }
-    } catch (linkErr) { LOG_ERR_('P1_MINI_CRM_UPLOAD_LINK', leadId, linkErr.message); }
+    }
+    SC_.remove('MASTER_SNAP_V1');
+    P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'CASE_DOC_UPLOAD',`${leadId}|${upload.names.length} file(s)`,'SAVED',100);
+    return{ok:true,folderUrl:upload.folderUrl,names:upload.names};
+  }catch(e){LOG_ERR_('P1_MINI_CRM_UPLOAD',(data&&data.leadId)||'',e.message);return{ok:false,err:e.message};}
+}
+function P1_MINI_CRM_UPLOAD(data){return P1_MINI_CRM_UPLOAD_(data);}
 
-    return { ok: true, folderUrl: folder.getUrl(), files: links };
-  } catch (e) { LOG_ERR_('P1_MINI_CRM_UPLOAD', '', e.message); return { ok: false, err: e.message }; }
+function get_boot_data(payload){
+  payload=payload||{};
+  const emp=String(payload.empCode||payload.emp||'').trim().toUpperCase();
+  const page=String(payload.page||'home').trim().toLowerCase();
+  const accessToken=String(payload.accessToken||payload.access_token||'').trim();
+  return{
+    ok:true,
+    baseUrl:P1_GET_EXEC_URL_(),
+    page,emp,
+    products:GET_ACTIVE_LOAN_PRODUCTS_(),
+    banks:P1_GET_BANK_OPTIONS_MAP_(),
+    staff:P1_GET_STAFF_PUBLIC_DATA_(emp),
+    dashboard:(page==='dashboard'&&P1_VALIDATE_ACCESS_TOKEN_(emp,accessToken))?P1_GET_STAFF_DASHBOARD_DATA_(emp):null
+  };
 }
 
-/* ── voice.html: FreePBX bridge request ── */
-function P1_PROCESS_VOICE_COMMAND(payload) {
-  payload = payload || {};
+function MLA_LOG_ACTIVITY(data){
+  data=data||{};
+  P1_LOG_AVATAR_ACTIVITY_(data.empCode,data.type,JSON.stringify({amount:data.amount||''}),'LOGGED',0);
+  return{ok:true};
+}
+
+function DC_TG_BROADCAST(msg){
+  if(!P1_ACTIVE_ADMIN_())throw new Error('Master access required');
+  const text=String(msg||'').trim();
+  if(!text)return'Message required';
+  return DC_SEND_TG_(text)?'Broadcast sent':'Broadcast failed — check Telegram configuration';
+}
+
+function P1_VERIFY_ACCESS(empCode,pin) {
+  const code=String(empCode||'').trim().toUpperCase(),attemptKey='P1_LOGIN_FAIL_'+code;
+  const lock=LockService.getScriptLock();if(!lock.tryLock(5000))return{ok:false,err:'Sign-in service busy. Retry shortly.'};
+  try{
+    const attempts=Number(SC_.get(attemptKey)||0);if(attempts>=5)return{ok:false,err:'Too many failed attempts. Try again after 5 minutes.'};
+    const emp=FIND_EMPLOYEE_FULL_(code),valid=!!emp&&P1_VERIFY_PIN_(code,String(pin||'').trim());
+    if(!valid){SC_.put(attemptKey,String(attempts+1),300);return{ok:false,err:'Invalid employee code or PIN'};}
+    SC_.remove(attemptKey);
+    return{ok:true,empCode:emp.EMP_CODE,name:emp.NAME,role:emp.ROLE,department:emp.DEPARTMENT||'',email:emp.EMAIL||'',manager_email_id:emp.MANAGER_EMAIL||'',accessToken:P1_ISSUE_ACCESS_TOKEN_(emp.EMP_CODE),err:''};
+  }finally{lock.releaseLock();}
+}
+
+/* ── Role dashboard engine: generated inside each employee personal file ── */
+function P1_ROLE_DASHBOARD_WRITE_(emp) {
+  if (!emp || !emp.PERSONAL_FILE_ID) return {ok:false, skipped:true};
+  const dashboard = P1_GET_STAFF_DASHBOARD_DATA_(emp.EMP_CODE);
+  if (!dashboard || !dashboard.ok) return {ok:false, err:(dashboard&&dashboard.err)||'Dashboard data unavailable'};
+  const pss = P1_OPEN_SS_SAFE_(emp.PERSONAL_FILE_ID);
+  const sh = pss.getSheetByName('ROLE_DASHBOARD') || pss.insertSheet('ROLE_DASHBOARD');
+  const generatedAt = new Date();
+  const summary = dashboard.stats || {};
+  const rows = [
+    ['DIVYANSHI CAPITAL AI BASED OS — ROLE DASHBOARD'],
+    ['GENERATED_AT', generatedAt],
+    ['EMP_CODE', emp.EMP_CODE],
+    ['NAME', emp.NAME || ''],
+    ['ROLE', emp.ROLE || ''],
+    ['DESIGNATION', emp.DESIGNATION || emp.ROLE || ''],
+    ['DEPARTMENT', emp.DEPARTMENT || ''],
+    ['ACCESS_SCOPE', dashboard.access || 'SELF'],
+    [],
+    ['METRIC', 'VALUE'],
+    ['TOTAL_CASES', Number(summary.total || 0)],
+    ['APPROVED_CASES', Number(summary.approved || 0)],
+    ['UNDER_REVIEW', Number(summary.review || 0)],
+    ['TOTAL_VOLUME', Number(summary.volume || 0)],
+    [],
+    ['LEAD_ID', 'CLIENT_NAME', 'LOAN_TYPE', 'AMOUNT', 'BANK', 'STATUS', 'TAT_STATUS']
+  ];
+  (dashboard.cases || []).slice(0, 100).forEach(c => rows.push([
+    c.leadId || '', c.clientName || '', c.loanType || '', c.amount || '', c.bank || '', c.status || '', c.tatStatus || ''
+  ]));
+  try { sh.getRange(1,1,Math.max(1,sh.getMaxRows()),7).breakApart(); } catch (_) {}
+  sh.clearContents();
+  sh.getRange(1, 1, rows.length, 7).setValues(rows.map(r => {
+    const out = r.slice(); while (out.length < 7) out.push(''); return out;
+  }));
+  sh.getRange(1, 1, 1, 7).mergeAcross().setBackground('#0d2260').setFontColor('#ffffff').setFontWeight('bold');
+  sh.getRange(10, 1, 1, 2).setBackground('#d4af37').setFontWeight('bold');
+  sh.getRange(16, 1, 1, 7).setBackground('#0d2260').setFontColor('#ffffff').setFontWeight('bold');
+  sh.setFrozenRows(16);
+  sh.autoResizeColumns(1, 7);
+  LOCK_MY_CASES_(sh, emp.EMP_CODE);
+  return {ok:true, cases:Number(summary.total || 0)};
+}
+
+function P1_SYNC_ROLE_DASHBOARDS_(actor) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return {ok:false, err:'Dashboard sync is already running'};
   try {
-    const code = String(payload.empCode || '').trim().toUpperCase();
-    if (!P1_VALIDATE_ACCESS_(code, payload.accessToken)) return { ok: false, err: 'Session expired' };
-    const lead=P1_CASE_FOR_EMPLOYEE_(code,payload.leadId);
-    if(!lead) return {ok:false,err:'Open Voice Control from an assigned case.'};
-    const mobile=DC_CLEAN_MOBILE_(lead.CLIENT_MOBILE||'');
-    if(!/^[6-9]\d{9}$/.test(mobile)) return {ok:false,err:'The assigned case does not have a valid Indian mobile number.'};
-    // A provider call is deliberately not claimed until a configured PBX adapter returns a call ID.
-    DC_SEND_TG_('📞 [VOICE CALL REQUEST] ' + code + ' → +91' + mobile + ' | Lead: ' + lead.LEAD_ID);
-    const sh=GET_OR_CREATE_('CALL_LOG'); P1_ENSURE_HEADERS_(sh,['TIMESTAMP','EMP_CODE','LEAD_ID','MOBILE','STATUS','REMARKS','DURATION_SEC']);
-    sh.appendRow([new Date(),code,lead.LEAD_ID,mobile,'VOICE_REQUEST_LOGGED','PBX adapter not configured',0]);
-    return {ok:true,message:'Call request logged. Your PBX administrator must configure the bridge before calls can be placed.'};
-  } catch (e) { LOG_ERR_('P1_PROCESS_VOICE_COMMAND', payload.empCode, e.message); return { ok: false, err: e.message }; }
+    const map = DC_BUILD_EMP_MAP_(true), result = {ok:true, synced:0, skipped:0, errors:[]};
+    Object.keys(map).forEach(code => {
+      const emp = map[code];
+      if (String(emp.ACTIVE_STATUS || '').toUpperCase() === 'INACTIVE' || !emp.PERSONAL_FILE_ID) { result.skipped++; return; }
+      try { const write = P1_ROLE_DASHBOARD_WRITE_(emp); if (write.ok) result.synced++; else result.skipped++; }
+      catch (err) { result.errors.push(code + ': ' + String(err.message || err).slice(0,120)); }
+    });
+    return result;
+  } finally { lock.releaseLock(); }
+}
+
+// Installable trigger only. It never accepts a browser request.
+function P1_ROLE_DASHBOARD_DAILY_() {
+  try { return P1_SYNC_ROLE_DASHBOARDS_(); }
+  catch (err) { LOG_ERR_('P1_ROLE_DASHBOARD_DAILY','',err.message); return {ok:false,err:err.message}; }
+}
+
+// Compatible with Sheet menu/manual execution and authenticated API calls.
+function SYNC_ROLE_DASHBOARDS_ENGINE(d) {
+  if (d && typeof d === 'object' && Object.keys(d).length) {
+    const actor = P1_REQUIRE_API_ACTOR_(d);
+    if (!actor || !P1_HAS_MASTER_ACCESS_(actor)) return {ok:false,err:'Master access required'};
+  } else if (!P1_ACTIVE_ADMIN_()) {
+    throw new Error('Master access required');
+  }
+  return P1_SYNC_ROLE_DASHBOARDS_();
 }

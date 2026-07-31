@@ -569,6 +569,7 @@ let selectedBanks = [];
 let currentStep = 1;
 let UPLOAD_TOKEN = '';
 let UPLOAD_TOKEN_ISSUED_AT = 0;
+let UPLOAD_TOKEN_PENDING = null;
 let SUBMISSION_KEY = '';
 let ROUTE_SIGNATURE = '';
 let CONSENT_VERSION = '';
@@ -680,11 +681,22 @@ function toggleFields() {
 
 function requestUploadToken(){
   if(!isGASConnected())return Promise.resolve('');
+  if(UPLOAD_TOKEN && Date.now()-UPLOAD_TOKEN_ISSUED_AT < 12*60*1000) return Promise.resolve(UPLOAD_TOKEN);
+  if(UPLOAD_TOKEN_PENDING) return UPLOAD_TOKEN_PENDING;
   if(!SUBMISSION_KEY)SUBMISSION_KEY=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+'_'+Math.random().toString(36).slice(2));
   const route=String($('manager_email_id')&&$('manager_email_id').value||'').trim().toLowerCase()||String($('emp_code')&&$('emp_code').value||'').trim().toUpperCase();
-  return new Promise((resolve,reject)=>google.script.run
-    .withSuccessHandler(function(token){UPLOAD_TOKEN=String(token||'');UPLOAD_TOKEN_ISSUED_AT=Date.now();resolve(UPLOAD_TOKEN);})
-    .withFailureHandler(reject).P1_ISSUE_UPLOAD_TOKEN(SUBMISSION_KEY,route));
+  UPLOAD_TOKEN_PENDING = new Promise((resolve,reject)=>google.script.run
+    .withSuccessHandler(function(token){
+      UPLOAD_TOKEN_PENDING = null;
+      UPLOAD_TOKEN=String(token||'');
+      UPLOAD_TOKEN_ISSUED_AT=Date.now();
+      resolve(UPLOAD_TOKEN);
+    })
+    .withFailureHandler(function(err){
+      UPLOAD_TOKEN_PENDING = null;
+      reject(err);
+    }).P1_ISSUE_UPLOAD_TOKEN(SUBMISSION_KEY,route));
+  return UPLOAD_TOKEN_PENDING;
 }
 
 function loadLoanData() {
@@ -813,7 +825,7 @@ function buildWAMsg(p) {
   const name = (p.client_name || '').split(' ')[0];
   const loan = p.loan_type || 'your requirement';
   const adv = BULBHUL_ADVICE[p.loan_type] || BULBHUL_ADVICE.default;
-  return `Hi ${name}, Divyanshi Capital me aapka swagat hai! ✅\n\nAapki ${loan} request received ho gayi hai.\n\n${adv}\n\nHamari team review ke baad aapse contact karegi.\n📞 Urgent: +91-9899032117\n\n— Team Divyanshi Capital`;
+  return `Hi ${name}, Divyanshi Capital me aapka swagat hai! ✅\n\nAapki ${loan} request received ho gayi hai.\n\n${adv}\n\nHamari team 2 ghante me call karegi.\n📞 Urgent: +91-9899032117\n\n— Team Divyanshi Capital`;
 }
 
 function showResult(lid, p, docAudit) {
@@ -938,11 +950,11 @@ async function submitForm() {
   const errMsg = validate(payload);
   if (errMsg) { setStatus('❌ ' + errMsg, 'error'); return; }
   const rawFiles = Array.from($('docFiles') ? $('docFiles').files || [] : []);
-  if (rawFiles.length > 3) { setStatus('❌ Max 3 files allowed', 'error'); return; }
-  const big = rawFiles.find(f => f.size > 2 * 1024 * 1024);
-  if (big) { setStatus('❌ "' + big.name + '" exceeds 2MB', 'error'); return; }
+  if (rawFiles.length > 8) { setStatus('❌ Max 8 files allowed', 'error'); return; }
+  const big = rawFiles.find(f => f.size > 5 * 1024 * 1024);
+  if (big) { setStatus('❌ "' + big.name + '" exceeds 5MB', 'error'); return; }
   const totalSize=rawFiles.reduce((s,f)=>s+f.size,0);
-  if(totalSize>5*1024*1024){setStatus('❌ Total upload exceeds 5MB', 'error');return;}
+  if(totalSize>10*1024*1024){setStatus('❌ Total upload exceeds 10MB', 'error');return;}
   if (!isGASConnected()) {
     setStatus('Preview only — nothing was saved. Open the deployed Apps Script web app to submit.', 'error');
     return;

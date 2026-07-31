@@ -3,7 +3,7 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <title>Divyanshi Capital | India's Largest Loan Facilitator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -135,55 +135,15 @@
     th{color:var(--gold);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;padding:14px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.06)}
     td{padding:14px 12px;font-size:13px;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap;color:rgba(255,255,255,0.85)}
     /* Card */
-    .card-page{background:#f3f0e8;min-height:100vh;padding:0;color:var(--navy)}
-    .card-site{width:min(1120px,100%);margin:0 auto;padding:0 22px 54px;display:flex;flex-direction:column;gap:22px}
-    .card-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0;border-bottom:1px solid rgba(11,31,58,.12)}
-    .card-brand{font-family:'Playfair Display',serif;font-size:17px;font-weight:900;color:var(--navy)}
-    .card-brand span{display:block;font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--gold-dim);margin-top:2px}
-    .card-nav-links{display:flex;align-items:center;gap:16px;font-size:12px;font-weight:700;color:var(--navy2)}
-    .card-nav-links a:hover{color:var(--gold-dim)}
-    .card-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);border-radius:28px;overflow:hidden;background:var(--navy);box-shadow:0 24px 60px rgba(11,31,58,.18)}
-    .bcard{padding:54px 48px;color:#fff;background:radial-gradient(circle at 92% 10%,rgba(201,168,76,.24),transparent 32%),linear-gradient(135deg,#102d52,#071426);position:relative}
-    .bcard:after{content:'';position:absolute;right:-46px;bottom:-72px;width:210px;height:210px;border:1px solid rgba(201,168,76,.25);border-radius:50%;box-shadow:0 0 0 28px rgba(201,168,76,.06),0 0 0 56px rgba(201,168,76,.035)}
-    .card-eyebrow{font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold2);margin-bottom:17px}
-    .bcard-main{position:relative;z-index:1;display:flex;gap:20px;align-items:center;margin-bottom:21px}
-    .card-bio{font-size:15px;color:rgba(255,255,255,.76);line-height:1.7;margin:0 0 24px;max-width:600px}
-    .card-bot-cta{display:flex;align-items:center;gap:13px;padding:17px 18px;border-radius:14px;background:linear-gradient(135deg,rgba(201,168,76,.24),rgba(201,168,76,.08));border:1px solid rgba(201,168,76,.42);cursor:pointer;text-align:left;width:100%;max-width:510px;transition:transform .2s,background .2s;color:#fff}
-    .card-bot-cta:hover{transform:translateY(-2px);background:linear-gradient(135deg,rgba(201,168,76,.35),rgba(201,168,76,.13))}
-    .card-bot-cta .cbc-av{width:38px;height:38px;border-radius:50%;background:var(--gold);color:#0a1628;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-    .card-bot-cta .cbc-txt strong{display:block;color:#fff;font-size:13px;font-weight:800}
-    .card-bot-cta .cbc-txt span{display:block;color:var(--green);font-size:11px;font-weight:700;margin-top:1px}
-    .card-company{padding:52px 44px;background:#fff;color:var(--navy);display:flex;flex-direction:column;justify-content:center}
-    .card-company h4{font-family:'Playfair Display',serif;font-size:30px;color:var(--navy);margin-bottom:14px;line-height:1.1}
-    .card-company p{font-size:14px;color:#596579;line-height:1.75;margin-bottom:22px}
-    .card-company .cc-stats{display:flex;gap:12px;margin-top:6px}
-    .card-company .cc-stats div{flex:1;text-align:center}
-    .card-company .cc-stats strong{display:block;color:var(--gold-dim);font-size:17px;font-weight:900}
-    .card-company .cc-stats span{font-size:9px;color:#7b8492;text-transform:uppercase;letter-spacing:.4px}
-    .card-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-    .card-services{padding:18px 0 8px}.card-services-head{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:16px}.card-services-head h3{font-size:27px;color:var(--navy)}.card-services-head p{font-size:13px;color:var(--muted);max-width:420px;line-height:1.5}.card-product-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.card-product{background:#fff;border:1px solid #e3ddd0;border-radius:14px;padding:18px;transition:transform .2s,box-shadow .2s}.card-product:hover{transform:translateY(-3px);box-shadow:var(--card-shadow)}.card-product .cp-icon{font-size:24px}.card-product strong{display:block;color:var(--navy);font-size:14px;margin-top:10px}.card-product span{display:block;font-size:11px;color:var(--gold-dim);font-weight:700;margin-top:5px}
-    .card-login-link{text-align:center;font-size:12px;color:#6e7785;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:5px}
-    .login-overlay{position:fixed;inset:0;background:rgba(5,10,25,0.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
-    .login-overlay.active{display:flex}
-    .login-box{width:340px;max-width:100%;background:#0f1f3d;border:1px solid rgba(201,168,76,0.3);border-radius:18px;padding:28px 24px;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,0.5)}
-    .login-box h3{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:4px}
-    .login-box p{font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:18px}
-    .login-box input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:#fff;font-size:14px;margin-bottom:12px}
-    .login-box input::placeholder{color:rgba(255,255,255,0.3)}
-    .login-box .lb-actions{display:flex;gap:10px;margin-top:6px}
-    .login-box .lb-actions button{flex:1;padding:12px;border-radius:10px;border:0;font-weight:800;font-size:13px;cursor:pointer}
-    .login-box .lb-cancel{background:rgba(255,255,255,0.08);color:#fff}
-    .login-box .lb-submit{background:var(--gold);color:#0a1628}
-    .login-box .lb-msg{font-size:12px;margin-top:10px;min-height:16px}
-    .login-box .lb-msg.err{color:#f87171}
-    .login-box .lb-msg.ok{color:var(--green)}
-    .bav-wrap{position:relative;width:98px;height:98px;flex:0 0 98px}
+    .card-page{background:radial-gradient(ellipse at top,#142d54,#0a1628);min-height:100vh;padding:40px 20px;display:flex;align-items:center;justify-content:center}
+    .bcard{width:400px;max-width:100%;border:1px solid rgba(201,168,76,0.2);border-radius:24px;padding:36px 28px;text-align:center;color:#fff;background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);box-shadow:0 30px 80px rgba(0,0,0,0.4)}
+    .bav-wrap{position:relative;width:100px;height:100px;margin:0 auto 6px}
     .bav{width:100px;height:100px;border-radius:50%;border:3px solid var(--gold);object-fit:cover}
     .bonline{position:absolute;bottom:4px;right:4px;width:20px;height:20px;background:var(--green);border:3px solid #0a1628;border-radius:50%;animation:pulse 2s infinite}
-    .bname{font-family:'Playfair Display',serif;font-size:31px;font-weight:700;color:#fff;margin-bottom:4px}
+    .bname{font-family:'Playfair Display',serif;font-size:24px;font-weight:700;color:#fff;margin-bottom:4px}
     .brole{font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:4px;letter-spacing:0.5px;text-transform:uppercase}
     .bco{font-size:13px;color:var(--gold);font-weight:700;margin-bottom:22px}
-    .blinks{display:flex;flex-direction:column;gap:10px;position:relative;z-index:1}
+    .blinks{display:flex;flex-direction:column;gap:10px}
     .blink{display:flex;align-items:center;gap:12px;padding:13px 18px;border-radius:12px;font-size:13px;font-weight:700;transition:all 0.2s;border:1px solid rgba(255,255,255,0.08);color:#fff;background:rgba(255,255,255,0.04)}
     .blink:hover{border-color:var(--gold);background:rgba(201,168,76,0.1);color:var(--gold);transform:translateX(4px)}
     .blink.primary{background:var(--gold);color:#000;border-color:var(--gold)}
@@ -223,19 +183,18 @@
     .fsoc a:hover{background:var(--gold);color:#000}
     @keyframes spin{to{transform:rotate(360deg)}}
     @media(max-width:900px){.hero-inner{grid-template-columns:1fr;gap:32px}.hero h1{font-size:32px}.calc-wrap{grid-template-columns:1fr}.fg{grid-template-columns:1fr 1fr}.nav{display:none}.header>.btn{display:none}}
-    @media(max-width:700px){.card-site{padding:0 14px 36px}.card-nav-links a:not(.card-nav-apply){display:none}.card-hero{grid-template-columns:1fr}.bcard{padding:34px 24px}.card-company{padding:34px 24px}.bname{font-size:27px}.card-company h4{font-size:26px}.card-actions,.card-product-grid{grid-template-columns:1fr}}
-    @media(max-width:480px){.hero{padding:44px 5% 36px}.section{padding:48px 5%}.form-box{padding:24px 18px}.fg{grid-template-columns:1fr}.bcard{padding:28px 20px}.bcard-main{align-items:flex-start}.bav-wrap{width:76px;height:76px;flex-basis:76px}.bav{width:76px;height:76px}.bonline{width:17px;height:17px}.bname{font-size:23px}}
+    @media(max-width:480px){.hero{padding:44px 5% 36px}.section{padding:48px 5%}.form-box{padding:24px 18px}.fg{grid-template-columns:1fr}.bcard{padding:28px 20px}}
   </style>
 </head>
 <body>
   <script id="BOOT_DATA" type="application/json">__P1_BOOT_DATA_JSON__</script>
-  <main id="app" role="main"><div style="display:flex;align-items:center;justify-content:center;height:80vh;flex-direction:column;gap:16px"><div style="width:40px;height:40px;border:4px solid #C9A84C;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite"></div><p style="color:#6b7280;font-size:14px">Loading...</p></div></main>
-  <button class="cfab" onclick="toggleChat()" id="chatFab" aria-label="Open Bulbhul AI Chat">💬</button>
+  <div id="app"></div>
+  <button class="cfab" onclick="toggleChat()" id="chatFab">💬</button>
   <div class="cbox" id="cbox">
     <div class="chead">
       <div class="chead-info">
         <div class="chead-av">🤖</div>
-        <div><div style="font-weight:700;font-size:14px" id="cheadName">Bulbhul AI Banker</div><div style="font-size:11px;color:var(--green);font-weight:600">● Online</div></div>
+        <div><div style="font-weight:700;font-size:14px">Bulbhul AI Banker</div><div style="font-size:11px;color:var(--green);font-weight:600">● Online</div></div>
       </div>
       <button onclick="toggleChat()" style="cursor:pointer;opacity:0.7;font-size:18px;background:none;border:0;color:#fff">✕</button>
     </div>
@@ -253,8 +212,6 @@ var PAGE=String(BOOT.page||qs.get('page')||'home').toLowerCase();
 var EMP=String(BOOT.emp||qs.get('emp')||qs.get('emp_code')||'').toUpperCase();
 var PRODUCT=String(BOOT.product||qs.get('product')||'').toUpperCase();
 var EMP_ENC=encodeURIComponent(EMP);
-var ACCESS_TOKEN='';
-try{ACCESS_TOKEN=String(sessionStorage.getItem('p1_access_'+EMP)||'').trim();}catch(_){}
 var PRODUCTS=BOOT.products&&BOOT.products.length?BOOT.products:[
   {code:'PL',name:'Personal Loan',icon:'💳',tat:3,roi:10.5},
   {code:'BL',name:'Business Loan',icon:'🏢',tat:7,roi:16},
@@ -283,7 +240,7 @@ function go(p){window.top.location.href=p.indexOf('?')===0?burl()+p:ru(p);}
 function callGAS(action,payload){
   return new Promise(function(res,rej){
     if(hasGAS()){google.script.run.withSuccessHandler(res).withFailureHandler(rej)[action](payload);}
-    else{rej(new Error('GAS not available'));}
+    else{fetch('/api/gas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action,payload:payload})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(res).catch(rej);}
   });
 }
 function hdr(){
@@ -342,30 +299,14 @@ function showTY(name,lid,tat,docs){
 function renderCard(){
   var s=STAFF;
   if(!s||!s.ok){$app(hdr()+'<div style="padding:60px;text-align:center"><h2 style="color:var(--navy)">Card not found</h2><p style="color:var(--muted);margin-top:8px">Valid EMP code ke saath URL open karein.</p></div>');return;}
-  var av=BOOT.avatar||null;
-  window.CARD_EMP_NAME=String(s.name||'Divyanshi Capital');
-  window.CARD_BOT=(av&&av.bot)||null;
   var pic=safe(s.profilePic||'https://ui-avatars.com/api/?name='+encodeURIComponent(s.name||'DC')+'&background=C9A84C&color=0B1F3A&size=200&bold=true');
   var mob=safe(s.mobile||'');
   var wa=safe(s.whatsapp||s.mobile||'');
   var tg=safe(s.tgChatId||'');
   var em=safe(s.email||'');
-  var bio=safe((av&&av.greeting)||('Namaste! Main '+(s.name||'Team Member')+' hoon — '+(s.role||'RM')+', Divyanshi Capital. Aapke loan ki puri journey me main aapke saath hoon.'));
-  var tagline=safe((av&&av.tagline)||((s.role||'RM')+' — Divyanshi Capital'));
   var waMsg=encodeURIComponent('Hi! Loan ke liye connect karna chahta/chahti hun.');
   var shareMsg=encodeURIComponent('Loan lena hai? Apply karein Divyanshi Capital — India\'s Largest Loan Facilitator!\n\n'+ru('form'));
-  var services=PRODUCTS.slice(0,6).map(function(p){return '<a class="card-product" href="'+safe(ru('form',{loan:p.name}))+'"><span class="cp-icon">'+safe(p.icon||'💼')+'</span><strong>'+safe(p.name||'Loan')+'</strong><span>Explore with '+safe(s.name||'your advisor')+' →</span></a>';}).join('');
-  $app('<div class="card-page"><div class="card-site">'
-    +'<div class="card-nav"><a class="card-brand" href="https://www.divyanshicapital.com" target="_blank">Divyanshi Capital<span>Employee advisory desk</span></a><div class="card-nav-links"><a href="https://www.divyanshicapital.com" target="_blank">Main website</a><a href="'+safe(ru('form'))+'" class="card-nav-apply">Apply for a loan →</a></div></div>'
-    +'<div class="card-hero"><section class="bcard"><div class="card-eyebrow">Your dedicated loan advisor</div><div class="bcard-main"><div class="bav-wrap"><img class="bav" src="'+pic+'" onerror="this.src=\'https://ui-avatars.com/api/?name='+encodeURIComponent(s.name||'DC')+'&background=C9A84C&color=0B1F3A&size=200&bold=true\'"><div class="bonline"></div></div><div><div class="bname">'+safe(s.name)+'</div><div class="brole">'+tagline+'</div><div class="bco">Divyanshi Capital Pvt Ltd</div></div></div>'
-      +'<p class="card-bio">'+bio+'</p><button type="button" class="card-bot-cta" onclick="openEmpChat()"><div class="cbc-av">🤖</div><div class="cbc-txt"><strong>Ask '+safe(s.name||'my')+'\'s Bulbhul assistant</strong><span>● Online 24/7 — loan, documents & next steps</span></div></button>'
-      +'<div class="blinks" style="margin-top:16px">'+(wa?'<a class="blink" href="https://wa.me/91'+wa+'?text='+waMsg+'" target="_blank" rel="noopener"><span class="bi">💬</span>Message on WhatsApp</a>':'')+(mob?'<a class="blink" href="tel:'+mob+'"><span class="bi">📞</span>Call '+mob+'</a>':'')+(em?'<a class="blink" href="mailto:'+em+'"><span class="bi">✉️</span>Email '+em+'</a>':'')+'</div></section>'
-    +'<aside class="card-company"><div class="slabel">The company behind your application</div><h4>One advisor. Hundreds of lender options.</h4><p>Divyanshi Capital connects each application with the right bank, documents and next step—so you have one person to call throughout the journey.</p><div class="cc-stats"><div><strong>15K+</strong><span>Loans processed</span></div><div><strong>500+</strong><span>Bank partners</span></div><div><strong>8.25%</strong><span>Rates from</span></div><div><strong>2009</strong><span>Established</span></div></div><div class="card-actions" style="margin-top:26px"><a class="btn" href="'+safe(ru('form'))+'">Start my application</a><button class="btn" style="background:var(--navy);color:#fff" onclick="openEmpChat()">Talk to Bulbhul</button></div></aside></div>'
-    +'<section class="card-services"><div class="card-services-head"><div><div class="slabel">How '+safe(s.name||'your advisor')+' can help</div><h3>Choose your loan path.</h3></div><p>Every option keeps this employee referral attached, so your application starts with the right advisor.</p></div><div class="card-product-grid">'+services+'</div></section>'
-    +'<div class="card-login-link" onclick="openStaffLogin()">Employee login</div>'
-  +'</div></div>'
-  +'<div class="login-overlay" id="loginOverlay"><div class="login-box"><h3 id="loginTitle">Staff Login</h3><p id="loginHelp">Enter your EMP code and password to open your dashboard.</p><input id="liEmp" placeholder="EMP Code, e.g. DC002" style="text-transform:uppercase"><input id="liPin" type="password" placeholder="Password" maxlength="64" onkeypress="if(event.key===\'Enter\')submitStaffLogin()"><div id="changePasswordFields" style="display:none"><input id="liNewPassword" type="password" placeholder="New password (minimum 8 characters)" maxlength="64"><input id="liConfirmPassword" type="password" placeholder="Confirm new password" maxlength="64"></div><div class="lb-actions"><button class="lb-cancel" onclick="closeStaffLogin()">Cancel</button><button class="lb-submit" id="liBtn" onclick="submitStaffLogin()">Login</button></div><button type="button" class="lb-cancel" id="changePasswordToggle" style="width:100%;margin-top:10px" onclick="togglePasswordChange()">Change password</button><div class="lb-msg" id="liMsg"></div></div></div>');
-  var liEmpEl=document.getElementById('liEmp');if(liEmpEl&&EMP&&EMP!=='EMP_CODE')liEmpEl.value=EMP;
+  $app('<div class="card-page"><div class="bcard"><div class="bav-wrap"><img class="bav" src="'+pic+'" onerror="this.src=\'https://ui-avatars.com/api/?name='+encodeURIComponent(s.name||'DC')+'&background=C9A84C&color=0B1F3A&size=200&bold=true\'"><div class="bonline"></div></div><div class="bname">'+safe(s.name)+'</div><div class="brole">'+safe(s.role||'Loan Advisor')+'</div><div class="bco">Divyanshi Capital Pvt Ltd</div><div class="blinks">'+(wa?'<a class="blink" href="https://wa.me/91'+wa+'?text='+waMsg+'" target="_blank"><span class="bi">💬</span>WhatsApp Me</a>':'')+  (mob?'<a class="blink" href="tel:'+mob+'"><span class="bi">📞</span>Call: '+mob+'</a>':'')+  (tg?'<a class="blink" href="https://t.me/'+tg+'" target="_blank"><span class="bi">✈️</span>Telegram: @'+tg+'</a>':'<a class="blink" href="https://t.me/divyanshicapital" target="_blank"><span class="bi">✈️</span>Telegram Channel</a>')+  (em?'<a class="blink" href="mailto:'+em+'"><span class="bi">✉️</span>'+em+'</a>':'')+  '<a class="blink primary" href="'+safe(ru('form'))+'"><span class="bi">📝</span>Apply for Loan Now</a><a class="blink" href="'+safe(ru('dashboard'))+'"><span class="bi">📊</span>My Dashboard</a><a class="blink" href="https://www.divyanshicapital.com" target="_blank"><span class="bi">🌐</span>divyanshicapital.com</a><a class="blink" style="background:rgba(37,211,102,0.1);border-color:rgba(37,211,102,0.3)" href="https://wa.me/?text='+shareMsg+'" target="_blank"><span class="bi">📤</span>Share My Loan Link</a></div><div style="margin-top:22px;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.5px;text-transform:uppercase">Powered by Bulbhul AI · P1 OS</div></div></div>');
 }
 function renderDashboard(){
   var d=DASH||{ok:true,staff:{NAME:'Team'},stats:{total:0,approved:0,review:0,volume:0},cases:[],access:'STAFF'};
@@ -424,78 +365,34 @@ function sendCamp(){
   callGAS('DC_TG_BROADCAST',msg).then(function(r){btn.disabled=false;alert(r||'Broadcast sent!');document.getElementById('cmp').value='';}).catch(function(e){btn.disabled=false;alert('Failed: '+(e.message||e));});
 }
 var chatOpen=false;
+var chatInFlight=false;
+var chatCooldownUntil=0;
 function toggleChat(){
   chatOpen=!chatOpen;
   var box=document.getElementById('cbox');
   box.style.display=chatOpen?'flex':'none';
   if(chatOpen){box.style.flexDirection='column';document.getElementById('ci').focus();}
 }
-function openEmpChat(){
-  var empName=window.CARD_EMP_NAME||'';
-  var bot=window.CARD_BOT||{};
-  var nameEl=document.getElementById('cheadName');
-  if(nameEl)nameEl.textContent=bot.title||(empName?(empName+"'s AI Assistant"):'Bulbhul AI Banker');
-  var body=document.getElementById('cbody');
-  if(body)body.innerHTML='<div class="bubble bot-b">'+safe(bot.greeting||('Namaste! Main Bulbhul hoon, '+empName+' ke saath Divyanshi Capital se. Aap kaise help chahte hain?'))+'</div>';
-  if(!chatOpen)toggleChat();
-}
-function openStaffLogin(){
-  var ov=document.getElementById('loginOverlay');if(!ov)return;
-  ov.classList.add('active');
-  var msg=document.getElementById('liMsg');if(msg){msg.textContent='';msg.className='lb-msg';}
-  var pinEl=document.getElementById('liPin');if(pinEl)pinEl.focus();
-}
-function closeStaffLogin(){
-  var ov=document.getElementById('loginOverlay');if(ov)ov.classList.remove('active');
-}
-function togglePasswordChange(){
-  var fields=document.getElementById('changePasswordFields'),title=document.getElementById('loginTitle'),help=document.getElementById('loginHelp'),btn=document.getElementById('liBtn'),toggle=document.getElementById('changePasswordToggle'),msg=document.getElementById('liMsg');
-  var change=fields&&fields.style.display==='none';if(!fields)return;fields.style.display=change?'block':'none';
-  title.textContent=change?'Change password':'Staff Login';help.textContent=change?'Enter your current password, then choose a new password.':'Enter your EMP code and password to open your dashboard.';btn.textContent=change?'Save password':'Login';toggle.textContent=change?'Back to login':'Change password';if(msg){msg.textContent='';msg.className='lb-msg';}
-}
-function submitStaffLogin(){
-  var empEl=document.getElementById('liEmp'),pinEl=document.getElementById('liPin'),msg=document.getElementById('liMsg'),btn=document.getElementById('liBtn');
-  var code=(empEl&&empEl.value||'').trim().toUpperCase();
-  var pin=(pinEl&&pinEl.value||'').trim();
-  var changing=document.getElementById('changePasswordFields')&&document.getElementById('changePasswordFields').style.display!=='none';
-  if(!code){msg.className='lb-msg err';msg.textContent='Enter your EMP code.';return;}
-  if(!pin){msg.className='lb-msg err';msg.textContent='Enter your PIN.';return;}
-  if(!hasGAS()){msg.className='lb-msg err';msg.textContent='Preview mode — open the deployed Web App to continue.';return;}
-  if(changing){var next=(document.getElementById('liNewPassword').value||''),confirm=(document.getElementById('liConfirmPassword').value||'');if(next!==confirm){msg.className='lb-msg err';msg.textContent='New passwords do not match.';return;}btn.disabled=true;btn.textContent='Saving...';callGAS('P1_CHANGE_EMP_PASSWORD',{empCode:code,currentPassword:pin,newPassword:next,accessToken:ACCESS_TOKEN}).then(function(res){btn.disabled=false;btn.textContent='Save password';if(res&&res.ok){try{sessionStorage.removeItem('p1_access_'+code);}catch(_){}msg.className='lb-msg ok';msg.textContent=res.message||'Password changed. Please sign in again.';pinEl.value='';document.getElementById('liNewPassword').value='';document.getElementById('liConfirmPassword').value='';}else{msg.className='lb-msg err';msg.textContent=(res&&res.err)||'Password change failed';}}).catch(function(err){btn.disabled=false;btn.textContent='Save password';msg.className='lb-msg err';msg.textContent=err&&err.message?err.message:'Connection failed';});return;}
-  btn.disabled=true;btn.textContent='Verifying...';msg.className='lb-msg';msg.textContent='';
-  callGAS('P1_VERIFY_EMP',{empCode:code,pin:pin}).then(function(res){
-    btn.disabled=false;btn.textContent='Login';
-    if(res&&res.ok){
-      msg.className='lb-msg ok';msg.textContent='Welcome, '+(res.name||code)+'! Redirecting...';
-      try{sessionStorage.setItem('p1_access_'+res.empCode,res.accessToken||'');}catch(_){}
-      setTimeout(function(){window.top.location.href=burl()+'?page=dashboard&emp='+encodeURIComponent(res.empCode);},700);
-    }else{msg.className='lb-msg err';msg.textContent=(res&&res.err)||'Login failed';}
-  }).catch(function(err){btn.disabled=false;btn.textContent='Login';msg.className='lb-msg err';msg.textContent=err&&err.message?err.message:'Connection failed';});
-}
 function sendChat(){
-  var inp=document.getElementById('ci');var txt=inp.value.trim();if(!txt)return;
+  if(chatInFlight||Date.now()<chatCooldownUntil)return;
+  var inp=document.getElementById('ci');var btn=document.querySelector('.csend');var txt=inp.value.trim();if(!txt)return;
+  chatInFlight=true;chatCooldownUntil=Date.now()+8000;
+  if(btn)btn.disabled=true;
   var body=document.getElementById('cbody');
   body.innerHTML+='<div class="bubble user-b">'+safe(txt)+'</div>';
   inp.value='';body.scrollTop=body.scrollHeight;
-  var publicCard=PAGE==='card'||PAGE==='home';
-  callGAS(publicCard?'P1_PUBLIC_CARD_CHAT':'BULBHUL_CHAT_API',publicCard?{message:txt,empCode:EMP}:{message:txt,empCode:EMP,accessToken:ACCESS_TOKEN,source:'INDEX'}).then(function(res){
+  callGAS('BULBHUL_CHAT_API',{message:txt,empCode:EMP,source:'INDEX'}).then(function(res){
     var reply=typeof res==='string'?res:(res&&(res.reply||res.text||res.message)||'Ji, bataiye?');
     body.innerHTML+='<div class="bubble bot-b">'+safe(reply)+'</div>';
     body.scrollTop=body.scrollHeight;
-  }).catch(function(err){body.innerHTML+='<div class="bubble bot-b">Offline: '+safe(err.message||String(err))+'</div>';body.scrollTop=body.scrollHeight;});
+  }).catch(function(err){body.innerHTML+='<div class="bubble bot-b">Offline: '+safe(err.message||String(err))+'</div>';body.scrollTop=body.scrollHeight;}).finally(function(){chatInFlight=false;if(btn)btn.disabled=false;});
 }
 function renderApp(){
   try{
     if(!document.getElementById('app'))return;
     if((!BOOT.staff||!BOOT.staff.ok)&&EMP&&EMP!=='EMP_CODE'){
       document.getElementById('app').innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:var(--navy)"><div style="width:44px;height:44px;border:4px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:14px"></div><strong>'+EMP+' profile sync ho raha hai...</strong></div>';
-      callGAS('get_boot_data',{empCode:EMP,page:PAGE,accessToken:ACCESS_TOKEN}).then(function(res){if(res){BOOT=res;if(res.staff)STAFF=res.staff;if(res.dashboard)DASH=res.dashboard;}renderPage();}).catch(function(){renderPage();});
-    }else if(PAGE==='dashboard'){
-      if(!ACCESS_TOKEN){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);return;}
-      callGAS('get_boot_data',{empCode:EMP,page:PAGE,accessToken:ACCESS_TOKEN}).then(function(res){
-        if(!res||!res.dashboard||!res.dashboard.ok){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);return;}
-        BOOT=res;STAFF=res.staff||STAFF;DASH=res.dashboard;renderPage();
-      }).catch(function(){window.top.location.href=burl()+'?page=card&emp='+encodeURIComponent(EMP);});
+      callGAS('get_boot_data',{empCode:EMP,page:PAGE}).then(function(res){if(res){BOOT=res;if(res.staff)STAFF=res.staff;if(res.dashboard)DASH=res.dashboard;}renderPage();}).catch(function(){renderPage();});
     }else renderPage();
   }catch(e){document.getElementById('app').innerHTML='<div style="padding:40px"><h2 style="color:red">Error</h2><p>'+safe(e.message)+'</p></div>';}
 }
