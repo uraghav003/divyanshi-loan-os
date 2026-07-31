@@ -982,7 +982,9 @@ async function submitForm() {
         showResult(res.leadId || res.lid, payload, res.docAudit || null);
         const df = $('docFiles'); if(df) df.value = '';
         const fl = $('fileList'); if(fl) fl.innerHTML = '';
-        SUBMISSION_KEY='';requestUploadToken();
+        SUBMISSION_KEY='';
+        UPLOAD_TOKEN='';
+        UPLOAD_TOKEN_ISSUED_AT=0;
       } else {
         requestUploadToken();
         setStatus('❌ Submit failed: ' + safe((res && (res.err || res.errorMessage)) || 'Unknown error'), 'error');

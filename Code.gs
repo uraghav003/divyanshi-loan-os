@@ -594,6 +594,8 @@ function BULBHUL_CHAT_API_(data) {
   const rawMsg = String(data.message||'').trim().slice(0,500);
   const emp    = data.empCode ? FIND_EMPLOYEE_FULL_(data.empCode) : null;
   const empCode = String(data.empCode || '').trim().toUpperCase();
+  const accessToken = String(data.accessToken || data.access_token || '').trim();
+  if (empCode && accessToken && !P1_VALIDATE_ACCESS_(empCode, accessToken)) return 'Your staff session has expired. Please sign in again.';
   if (empCode && THROTTLE_ONCE_('AI_CHAT_THROTTLE_' + empCode, 8)) return 'Ek moment, previous message process ho raha hai. Thoda wait karein.';
   const role   = emp ? String(emp.ROLE||'').toUpperCase() : '';
   if(emp&&/(^|\s)\/?(system|health|avatars?|bugs?|performance)(\s|$)/i.test(rawMsg)){
@@ -976,7 +978,6 @@ function P1_SMART_FORM_SUBMIT_(p,trustedTrigger) {
     if(!trustedTrigger&&String(p.website||p.company_website||'').trim())return{ok:false,err:'Submission rejected'};
     if(!trustedTrigger&&!P1_RATE_LIMIT_INTAKE_(p))return{ok:false,err:'Too many submissions. Try again later.'};
     const routeKey=DC_CLEAN_EMAIL_(p.manager_email_id||p.manager_email||p.MANAGER_EMAIL_ID||p.MANAGER_EMAIL||'')||String(p.emp_code||p.EMP_CODE||'').trim().toUpperCase();
-    if(!trustedTrigger&&!P1_CONSUME_UPLOAD_TOKEN_(p.upload_token,submissionKey,routeKey))return{ok:false,err:'Form session expired. Refresh and retry.'};
     idem=P1_IDEMPOTENCY_BEGIN_(submissionKey);
     if(!idem.ok)return{ok:false,err:idem.err};
     if(idem.replay)return idem.replay;
@@ -1004,6 +1005,7 @@ function P1_SMART_FORM_SUBMIT_(p,trustedTrigger) {
     if(!routeEmp)return finish({ok:false,err:'Manager/staff routing key is invalid or inactive'});
     if(!trustedTrigger&&!P1_VERIFY_ROUTE_SIGNATURE_(routeEmp.EMP_CODE,routeEmp.EMAIL,p.route_signature||p.ROUTE_SIGNATURE))return finish({ok:false,err:'Assigned staff link is invalid or expired'});
     if(entryType==='DOC_UPLOAD'&&(!Array.isArray(p.files)||!p.files.length))return finish({ok:false,err:'Select at least one document to upload'});
+    if(!trustedTrigger&&!P1_CONSUME_UPLOAD_TOKEN_(p.upload_token,submissionKey,routeKey))return finish({ok:false,err:'Form session expired. Refresh and retry.'});
     const caseId='L'+mobile.slice(-4)+'_'+Date.now(),upload=P1_SAVE_CLIENT_DOCS_(p,caseId),docAudit=P1_DOC_AUDIT_(p,upload);
     const result=DC_PROCESS_LEAD_({
       LEAD_ID:caseId,
@@ -2705,10 +2707,11 @@ function P1_CALLING_AI_REMARK_(data){
     const emp=FIND_EMPLOYEE_FULL_(empCode),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId);
     if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Case access denied'};
     const fallback=`Follow up on ${lead.LOAN_TYPE||'loan'} requirement. Confirm current interest, pending documents, preferred bank and next callback time.`;
-    const cacheKey='CALLING_AI_REMARK_' + empCode + '_' + leadId;
+    const leadSig=P1_B64URL_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,JSON.stringify({loan:lead.LOAN_TYPE||'',bank:lead.PREFERRED_BANK||'',status:lead.CASE_CATEGORY||'',tat:lead.TAT_STATUS||'',docStatus:lead.DOC_STATUS||'',amount:lead.REQUIRED_LOAN_AMOUNT||'',owner:lead.EMP_CODE||'',emp:empCode}),Utilities.Charset.UTF_8)).slice(0,32);
+    const cacheKey='CALLING_AI_REMARK_' + empCode + '_' + leadId + '_' + leadSig;
     const cached=SC_.get(cacheKey);
     if(cached) return {ok:true,remark:String(cached).slice(0,500),mode:'CACHE'};
-    if(THROTTLE_ONCE_('CALLING_AI_THROTTLE_' + empCode + '_' + leadId, 12)) return {ok:true,remark:fallback,mode:'THROTTLED'};
+    if(THROTTLE_ONCE_('CALLING_AI_THROTTLE_' + empCode + '_' + leadId + '_' + leadSig, 12)) return {ok:true,remark:fallback,mode:'THROTTLED'};
     if(!(DC_CFG.DEEPSEEK_KEY||DC_CFG.OPENAI_KEY||DC_CFG.GEMINI_KEY))return{ok:true,remark:fallback,mode:'RULES'};
     const prompt='Create one short factual call-note suggestion from these redacted case facts:\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,status:lead.CASE_CATEGORY,tat:lead.TAT_STATUS,docStatus:lead.DOC_STATUS,amount:lead.REQUIRED_LOAN_AMOUNT});
     const remark=MULTI_BRAIN_REPLY_(prompt,'You assist an authorised loan calling employee. Suggest only; do not claim a call happened or documents were verified. No commands, no personal data.',160);
@@ -2784,6 +2787,7 @@ function get_boot_data(payload){
     products:GET_ACTIVE_LOAN_PRODUCTS_(),
     banks:P1_GET_BANK_OPTIONS_MAP_(),
     staff:P1_GET_STAFF_PUBLIC_DATA_(emp),
+    avatar:(page==='card'&&emp)?P1_GET_PUBLIC_CARD_PROFILE_(emp):null,
     dashboard:(page==='dashboard'&&P1_VALIDATE_ACCESS_TOKEN_(emp,accessToken))?P1_GET_STAFF_DASHBOARD_DATA_(emp):null
   };
 }
