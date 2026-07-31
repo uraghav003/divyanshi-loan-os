@@ -1151,7 +1151,15 @@ function DC_PROCESS_LEAD_(lead) {
     try {
       const aiPrompt='[REDACTED CREDIT FACTS]\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,documentStatus:lead.DOC_STATUS,emp:lead.EMP_CODE},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
       const aiSys=BULBHUL_SYS_BASE_+'\n\nTask: Credit analysis. 4 sections:\n#### CIBIL Requirements:\n#### Matching Banks:\n#### Red Flags:\n#### Next Steps:';
-      aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys,500);
+      const aiDigest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,aiPrompt+'||'+aiSys,Utilities.Charset.UTF_8);
+      const aiCacheKey='DC_LEAD_AI_V1_'+P1_B64URL_(aiDigest).slice(0,40);
+      const cachedAdvice=SC_.get(aiCacheKey);
+      if(cachedAdvice){
+        aiAdvice=String(cachedAdvice);
+      }else{
+        aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys,500);
+        SC_.put(aiCacheKey,String(aiAdvice||'').slice(0,2000),6*60*60);
+      }
       lead.AI_ADVICE=aiAdvice;
     } catch(ae){ aiAdvice='AI analysis unavailable.'; lead.AI_ADVICE=aiAdvice; }
 
@@ -2675,7 +2683,17 @@ function P1_CALLING_UPDATE_(data){
 }
 
 function P1_CALLING_START_(data){
-  data=data||{};if(!P1_VALIDATE_ACCESS_TOKEN_(data.empCode,data.accessToken))return{ok:false,err:'Calling session expired'};const emp=FIND_EMPLOYEE_FULL_(String(data.empCode||'').trim().toUpperCase()),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===String(data.leadId||'').toUpperCase());if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Calling access denied'};P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'CALL_STARTED',lead.LEAD_ID,'DIALER_OPENED',0);return{ok:true};
+  data=data||{};
+  const empCode=String(data.empCode||'').trim().toUpperCase();
+  const leadId=String(data.leadId||'').trim().toUpperCase();
+  if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,data.accessToken))return{ok:false,err:'Calling session expired'};
+  const emp=FIND_EMPLOYEE_FULL_(empCode),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId);
+  if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Calling access denied'};
+  const cache=CacheService.getScriptCache(),guardKey='CALL_START_'+emp.EMP_CODE+'_'+lead.LEAD_ID;
+  if(cache.get(guardKey))return{ok:true,duplicate:true};
+  cache.put(guardKey,'1',20);
+  P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'CALL_STARTED',lead.LEAD_ID,'DIALER_OPENED',0);
+  return{ok:true};
 }
 
 function P1_CALLING_AI_REMARK_(data){

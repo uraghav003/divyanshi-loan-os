@@ -453,6 +453,8 @@ let SELECTED_DISPOSITION = "";
 let ACTION_IN_PROGRESS   = false;
 let COPILOT_IN_FLIGHT = false;
 let ASSISTANT_CHAT_IN_FLIGHT = false;
+let CALL_START_IN_FLIGHT = false;
+let CALL_START_UNLOCK_TIMER = null;
 
 function hasBackend() { return !!(window.google && google.script && google.script.run); }
 function getParam(n)  { return new URLSearchParams(window.location.search).get(n) || ""; }
@@ -566,13 +568,22 @@ function switchPage(page, el) {
 // ── CALL FLOW ─────────────────────────────────────────────────
 function initiateCall() {
   if (!MOBILE_RE.test(CURRENT_MOBILE)) { showToast("Valid 10-digit mobile required"); return; }
+  if (CALL_START_IN_FLIGHT) return;
+  CALL_START_IN_FLIGHT = true;
+  clearTimeout(CALL_START_UNLOCK_TIMER);
   const overlay = byId("callOverlay");
+  const startBtn = byId("startBtn");
+  if (startBtn) startBtn.disabled = true;
   byId("overlayName").innerText   = byId("clientName").innerText;
   byId("overlayPhone").innerText  = "+91 " + CURRENT_MOBILE;
   byId("overlayStatus").innerText = "Opening phone dialer...";
   overlay.classList.add("active");
   window.open("tel:" + CURRENT_MOBILE, "_top");
   byId("overlayStatus").innerText = "Dialer opened — save the actual outcome after the call";startCallTimer();
+  CALL_START_UNLOCK_TIMER = setTimeout(function(){
+    CALL_START_IN_FLIGHT = false;
+    if (startBtn) startBtn.disabled = !MOBILE_RE.test(CURRENT_MOBILE);
+  }, 8000);
   if(hasBackend())google.script.run.P1_CALLING_START({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
 }
 
@@ -588,8 +599,11 @@ function startCallTimer() {
 
 function endCurrentCall() {
   clearInterval(CALL_TIMER_INTERVAL);
+  clearTimeout(CALL_START_UNLOCK_TIMER);
+  CALL_START_IN_FLIGHT = false;
   byId("overlayWaveform").classList.remove("show");
   byId("callOverlay").classList.remove("active");
+  byId("startBtn").disabled = !MOBILE_RE.test(CURRENT_MOBILE);
   openNotesModal();
 }
 
