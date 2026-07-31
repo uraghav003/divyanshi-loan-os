@@ -47,6 +47,14 @@ function CACHED_GET_(key, ttlSeconds, fn) {
   return val;
 }
 
+function THROTTLE_ONCE_(key, ttlSeconds) {
+  key = String(key || '').trim();
+  if (!key) return false;
+  if (SC_.get(key)) return true;
+  try { SC_.put(key, '1', Math.max(1, Number(ttlSeconds) || 1)); } catch (_) {}
+  return false;
+}
+
 // ── Invalidate all caches ──
 function INVALIDATE_ALL_CACHES_() {
   DC_EMP_CACHE_ = null; ROUTING_CACHE_ = null;
@@ -525,7 +533,13 @@ function BUILD_AI_CONTEXT_(empCode) {
    SECTION 09 — AI BRAIN (DeepSeek → OpenAI → Gemini → fallback)
    ================================================================ */
 
-function MULTI_BRAIN_REPLY_(prompt, systemContent) {
+function MULTI_BRAIN_REPLY_(prompt, systemContent, maxOutputTokens) {
+  // Keep AI requests deliberately small: this assistant is advisory-only and
+  // its UI already asks for short answers.  Callers can opt into a larger
+  // budget only where a structured credit note genuinely needs it.
+  const outputLimit=Math.max(80,Math.min(550,Number(maxOutputTokens)||350));
+  prompt=String(prompt||'').slice(0,1800);
+  systemContent=String(systemContent||'').slice(0,1800);
   const opts = (key, url, body) => ({
     method:'post', muteHttpExceptions:true,
     headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
@@ -536,19 +550,19 @@ function MULTI_BRAIN_REPLY_(prompt, systemContent) {
 
   if (dKey) {
     try {
-      const res = UrlFetchApp.fetch('https://api.deepseek.com/v1/chat/completions', opts(dKey,'',{model:'deepseek-chat',messages:msgs,temperature:0.3,max_tokens:900}));
+      const res = UrlFetchApp.fetch('https://api.deepseek.com/v1/chat/completions', opts(dKey,'',{model:'deepseek-chat',messages:msgs,temperature:0.3,max_tokens:outputLimit}));
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.choices?.[0]?.message?.content) return String(j.choices[0].message.content).trim(); }
     } catch(e){ LOG_ERR_('AI_DS','',e.message); }
   }
   if (oKey) {
     try {
-      const res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', opts(oKey,'',{model:'gpt-4o-mini',messages:msgs,temperature:0.3,max_tokens:900}));
+      const res = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', opts(oKey,'',{model:'gpt-4o-mini',messages:msgs,temperature:0.3,max_tokens:outputLimit}));
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.choices?.[0]?.message?.content) return String(j.choices[0].message.content).trim(); }
     } catch(e){ LOG_ERR_('AI_OAI','',e.message); }
   }
   if (gKey) {
     try {
-      const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+gKey, {method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({contents:[{role:'user',parts:[{text:'System:\n'+systemContent+'\n\nUser:\n'+prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:900}})});
+      const res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+gKey, {method:'post',contentType:'application/json',muteHttpExceptions:true,payload:JSON.stringify({contents:[{role:'user',parts:[{text:'System:\n'+systemContent+'\n\nUser:\n'+prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:outputLimit}})});
       if (res.getResponseCode()===200) { const j=JSON.parse(res.getContentText()||'{}'); if(j.candidates?.[0]?.content?.parts?.[0]?.text) return String(j.candidates[0].content.parts[0].text).trim(); }
     } catch(e){ LOG_ERR_('AI_GEM','',e.message); }
   }
@@ -577,15 +591,17 @@ const BULBHUL_SYS_BASE_ =
 
 function BULBHUL_CHAT_API_(data) {
   data = data||{};
-  const rawMsg = String(data.message||'').trim().slice(0,1000);
+  const rawMsg = String(data.message||'').trim().slice(0,500);
   const emp    = data.empCode ? FIND_EMPLOYEE_FULL_(data.empCode) : null;
+  const empCode = String(data.empCode || '').trim().toUpperCase();
+  if (empCode && THROTTLE_ONCE_('AI_CHAT_THROTTLE_' + empCode, 8)) return 'Ek moment, previous message process ho raha hai. Thoda wait karein.';
   const role   = emp ? String(emp.ROLE||'').toUpperCase() : '';
   if(emp&&/(^|\s)\/?(system|health|avatars?|bugs?|performance)(\s|$)/i.test(rawMsg)){
     const direct=P1_FORMAT_MASTER_CONTROL_(emp.EMP_CODE);P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'SYSTEM_CONTROL',rawMsg,'ANSWERED',100);return direct;
   }
   let rolePrompt = BULBHUL_ROLE_PROMPTS_['SALES MEMBER'];
   for (const k of Object.keys(BULBHUL_ROLE_PROMPTS_)) { if(role.includes(k)){rolePrompt=BULBHUL_ROLE_PROMPTS_[k];break;} }
-  const sysPrompt = BULBHUL_SYS_BASE_ + '\n\n[LIVE CONTEXT]\n' + BUILD_AI_CONTEXT_(data.empCode) + '\n\n' + rolePrompt;
+  const sysPrompt = BULBHUL_SYS_BASE_ + '\n\n[LIVE CONTEXT]\n' + BUILD_AI_CONTEXT_(data.empCode).slice(0,1000) + '\n\n' + rolePrompt;
 
   let extraCtx = '';
   try {
@@ -600,7 +616,12 @@ function BULBHUL_CHAT_API_(data) {
   } catch(_){}
 
   const fullPrompt = (emp?`[SENDER] ${emp.NAME}(${emp.EMP_CODE})|${emp.ROLE}\n`:'[SENDER] Visitor\n') + extraCtx + '\n\n[USER]: ' + rawMsg;
-  const reply = MULTI_BRAIN_REPLY_(fullPrompt, sysPrompt);
+  // Repeated taps / webhook retries must not spend a second AI request.
+  const cacheKey='AI_CHAT_V1_'+P1_B64URL_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(data.empCode||'')+'|'+fullPrompt,Utilities.Charset.UTF_8)).slice(0,40);
+  const cached=SC_.get(cacheKey);
+  if(cached) return cached;
+  const reply = MULTI_BRAIN_REPLY_(fullPrompt, sysPrompt, 350);
+  SC_.put(cacheKey,String(reply||'').slice(0,1600),300);
   if(emp)P1_LOG_AVATAR_ACTIVITY_(emp.EMP_CODE,'BULBHUL_CHAT',rawMsg,'ANSWERED',100);
   return reply;
 }
@@ -1130,7 +1151,7 @@ function DC_PROCESS_LEAD_(lead) {
     try {
       const aiPrompt='[REDACTED CREDIT FACTS]\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,amount:lead.REQUIRED_LOAN_AMOUNT,income:lead.MONTHLY_INCOME,cibil:lead.CIBIL_SCORE,emi:lead.EXISTING_EMI,documentStatus:lead.DOC_STATUS,emp:lead.EMP_CODE},null,2)+'\n\n[CTX]\n'+BUILD_AI_CONTEXT_(lead.EMP_CODE);
       const aiSys=BULBHUL_SYS_BASE_+'\n\nTask: Credit analysis. 4 sections:\n#### CIBIL Requirements:\n#### Matching Banks:\n#### Red Flags:\n#### Next Steps:';
-      aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys);
+      aiAdvice=MULTI_BRAIN_REPLY_(aiPrompt,aiSys,500);
       lead.AI_ADVICE=aiAdvice;
     } catch(ae){ aiAdvice='AI analysis unavailable.'; lead.AI_ADVICE=aiAdvice; }
 
@@ -2658,7 +2679,24 @@ function P1_CALLING_START_(data){
 }
 
 function P1_CALLING_AI_REMARK_(data){
-  try{data=data||{};if(!P1_VALIDATE_ACCESS_TOKEN_(data.empCode,data.accessToken))return{ok:false,err:'Calling session expired'};const emp=FIND_EMPLOYEE_FULL_(String(data.empCode||'').trim().toUpperCase()),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===String(data.leadId||'').toUpperCase());if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Case access denied'};const fallback=`Follow up on ${lead.LOAN_TYPE||'loan'} requirement. Confirm current interest, pending documents, preferred bank and next callback time.`;if(!(DC_CFG.DEEPSEEK_KEY||DC_CFG.OPENAI_KEY||DC_CFG.GEMINI_KEY))return{ok:true,remark:fallback,mode:'RULES'};const prompt='Create one short factual call-note suggestion from these redacted case facts:\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,status:lead.CASE_CATEGORY,tat:lead.TAT_STATUS,docStatus:lead.DOC_STATUS,amount:lead.REQUIRED_LOAN_AMOUNT});const remark=MULTI_BRAIN_REPLY_(prompt,'You assist an authorised loan calling employee. Suggest only; do not claim a call happened or documents were verified. No commands, no personal data.');return{ok:true,remark:String(remark||fallback).slice(0,500),mode:'AI'};}catch(e){LOG_ERR_('P1_CALLING_AI_REMARK','',e.message);return{ok:false,err:e.message};}
+  try{
+    data=data||{};
+    const empCode=String(data.empCode||'').trim().toUpperCase();
+    const leadId=String(data.leadId||'').trim().toUpperCase();
+    if(!P1_VALIDATE_ACCESS_TOKEN_(empCode,data.accessToken))return{ok:false,err:'Calling session expired'};
+    const emp=FIND_EMPLOYEE_FULL_(empCode),lead=GET_MASTER_SNAPSHOT_().find(c=>String(c.LEAD_ID||'').toUpperCase()===leadId);
+    if(!P1_CALLING_CAN_ACCESS_(emp,lead))return{ok:false,err:'Case access denied'};
+    const fallback=`Follow up on ${lead.LOAN_TYPE||'loan'} requirement. Confirm current interest, pending documents, preferred bank and next callback time.`;
+    const cacheKey='CALLING_AI_REMARK_' + empCode + '_' + leadId;
+    const cached=SC_.get(cacheKey);
+    if(cached) return {ok:true,remark:String(cached).slice(0,500),mode:'CACHE'};
+    if(THROTTLE_ONCE_('CALLING_AI_THROTTLE_' + empCode + '_' + leadId, 12)) return {ok:true,remark:fallback,mode:'THROTTLED'};
+    if(!(DC_CFG.DEEPSEEK_KEY||DC_CFG.OPENAI_KEY||DC_CFG.GEMINI_KEY))return{ok:true,remark:fallback,mode:'RULES'};
+    const prompt='Create one short factual call-note suggestion from these redacted case facts:\n'+JSON.stringify({loan:lead.LOAN_TYPE,bank:lead.PREFERRED_BANK,status:lead.CASE_CATEGORY,tat:lead.TAT_STATUS,docStatus:lead.DOC_STATUS,amount:lead.REQUIRED_LOAN_AMOUNT});
+    const remark=MULTI_BRAIN_REPLY_(prompt,'You assist an authorised loan calling employee. Suggest only; do not claim a call happened or documents were verified. No commands, no personal data.',160);
+    SC_.put(cacheKey,String(remark||fallback).slice(0,500),600);
+    return{ok:true,remark:String(remark||fallback).slice(0,500),mode:'AI'};
+  }catch(e){LOG_ERR_('P1_CALLING_AI_REMARK','',e.message);return{ok:false,err:e.message};}
 }
 
 function P1_PROCESS_VOICE_COMMAND_(data){

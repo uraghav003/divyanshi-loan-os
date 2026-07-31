@@ -365,6 +365,8 @@ function sendCamp(){
   callGAS('DC_TG_BROADCAST',msg).then(function(r){btn.disabled=false;alert(r||'Broadcast sent!');document.getElementById('cmp').value='';}).catch(function(e){btn.disabled=false;alert('Failed: '+(e.message||e));});
 }
 var chatOpen=false;
+var chatInFlight=false;
+var chatCooldownUntil=0;
 function toggleChat(){
   chatOpen=!chatOpen;
   var box=document.getElementById('cbox');
@@ -372,7 +374,10 @@ function toggleChat(){
   if(chatOpen){box.style.flexDirection='column';document.getElementById('ci').focus();}
 }
 function sendChat(){
-  var inp=document.getElementById('ci');var txt=inp.value.trim();if(!txt)return;
+  if(chatInFlight||Date.now()<chatCooldownUntil)return;
+  var inp=document.getElementById('ci');var btn=document.querySelector('.csend');var txt=inp.value.trim();if(!txt)return;
+  chatInFlight=true;chatCooldownUntil=Date.now()+8000;
+  if(btn)btn.disabled=true;
   var body=document.getElementById('cbody');
   body.innerHTML+='<div class="bubble user-b">'+safe(txt)+'</div>';
   inp.value='';body.scrollTop=body.scrollHeight;
@@ -380,7 +385,7 @@ function sendChat(){
     var reply=typeof res==='string'?res:(res&&(res.reply||res.text||res.message)||'Ji, bataiye?');
     body.innerHTML+='<div class="bubble bot-b">'+safe(reply)+'</div>';
     body.scrollTop=body.scrollHeight;
-  }).catch(function(err){body.innerHTML+='<div class="bubble bot-b">Offline: '+safe(err.message||String(err))+'</div>';body.scrollTop=body.scrollHeight;});
+  }).catch(function(err){body.innerHTML+='<div class="bubble bot-b">Offline: '+safe(err.message||String(err))+'</div>';body.scrollTop=body.scrollHeight;}).finally(function(){chatInFlight=false;if(btn)btn.disabled=false;});
 }
 function renderApp(){
   try{

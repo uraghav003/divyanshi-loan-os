@@ -569,6 +569,7 @@ let selectedBanks = [];
 let currentStep = 1;
 let UPLOAD_TOKEN = '';
 let UPLOAD_TOKEN_ISSUED_AT = 0;
+let UPLOAD_TOKEN_PENDING = null;
 let SUBMISSION_KEY = '';
 let ROUTE_SIGNATURE = '';
 let CONSENT_VERSION = '';
@@ -680,11 +681,22 @@ function toggleFields() {
 
 function requestUploadToken(){
   if(!isGASConnected())return Promise.resolve('');
+  if(UPLOAD_TOKEN && Date.now()-UPLOAD_TOKEN_ISSUED_AT < 12*60*1000) return Promise.resolve(UPLOAD_TOKEN);
+  if(UPLOAD_TOKEN_PENDING) return UPLOAD_TOKEN_PENDING;
   if(!SUBMISSION_KEY)SUBMISSION_KEY=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now()+'_'+Math.random().toString(36).slice(2));
   const route=String($('manager_email_id')&&$('manager_email_id').value||'').trim().toLowerCase()||String($('emp_code')&&$('emp_code').value||'').trim().toUpperCase();
-  return new Promise((resolve,reject)=>google.script.run
-    .withSuccessHandler(function(token){UPLOAD_TOKEN=String(token||'');UPLOAD_TOKEN_ISSUED_AT=Date.now();resolve(UPLOAD_TOKEN);})
-    .withFailureHandler(reject).P1_ISSUE_UPLOAD_TOKEN(SUBMISSION_KEY,route));
+  UPLOAD_TOKEN_PENDING = new Promise((resolve,reject)=>google.script.run
+    .withSuccessHandler(function(token){
+      UPLOAD_TOKEN_PENDING = null;
+      UPLOAD_TOKEN=String(token||'');
+      UPLOAD_TOKEN_ISSUED_AT=Date.now();
+      resolve(UPLOAD_TOKEN);
+    })
+    .withFailureHandler(function(err){
+      UPLOAD_TOKEN_PENDING = null;
+      reject(err);
+    }).P1_ISSUE_UPLOAD_TOKEN(SUBMISSION_KEY,route));
+  return UPLOAD_TOKEN_PENDING;
 }
 
 function loadLoanData() {

@@ -451,6 +451,8 @@ let CALL_TIMER_INTERVAL = null;
 let CALL_SECONDS    = 0;
 let SELECTED_DISPOSITION = "";
 let ACTION_IN_PROGRESS   = false;
+let COPILOT_IN_FLIGHT = false;
+let ASSISTANT_CHAT_IN_FLIGHT = false;
 
 function hasBackend() { return !!(window.google && google.script && google.script.run); }
 function getParam(n)  { return new URLSearchParams(window.location.search).get(n) || ""; }
@@ -633,9 +635,18 @@ function setTemplate(type) {
 }
 
 function triggerAICopilot() {
+  if(COPILOT_IN_FLIGHT)return;
   if(!CURRENT_LEAD_ID||!hasBackend()){showToast("Live assigned case and backend required");return;}
+  COPILOT_IN_FLIGHT = true;
   showToast("Divyanshi Assistant is checking this assigned case...");
-  google.script.run.withSuccessHandler(function(res){if(res&&res.ok){byId("formRemarks").value=res.remark||'';showToast("Divyanshi Assistant suggestion ready — verify before saving");}else showToast((res&&res.err)||"AI suggestion unavailable");}).withFailureHandler(function(err){showToast(err&&err.message?err.message:"AI connection failed");}).P1_CALLING_AI_REMARK({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
+  google.script.run.withSuccessHandler(function(res){
+    COPILOT_IN_FLIGHT = false;
+    if(res&&res.ok){byId("formRemarks").value=res.remark||'';showToast("Divyanshi Assistant suggestion ready — verify before saving");}
+    else showToast((res&&res.err)||"AI suggestion unavailable");
+  }).withFailureHandler(function(err){
+    COPILOT_IN_FLIGHT = false;
+    showToast(err&&err.message?err.message:"AI connection failed");
+  }).P1_CALLING_AI_REMARK({empCode:AGENT_CODE,leadId:CURRENT_LEAD_ID,accessToken:ACCESS_TOKEN});
 }
 
 // ── SUBMIT DISPOSITION ────────────────────────────────────────
@@ -714,9 +725,17 @@ function toggleAssistantChat(){const overlay=byId('assistantOverlay'),open=!over
 function addAssistantMessage(text,kind){const node=document.createElement('div');node.className='assistant-message '+kind;node.textContent=String(text||'');byId('assistantMessages').appendChild(node);byId('assistantMessages').scrollTop=byId('assistantMessages').scrollHeight;}
 function sendAssistantMessage(){
   const input=byId('assistantInput'),message=input.value.trim();if(!message)return;
+  if(ASSISTANT_CHAT_IN_FLIGHT)return;
   if(!hasBackend()||!AGENT_CODE||!ACCESS_TOKEN){showToast('Verified employee session required');return;}
+  ASSISTANT_CHAT_IN_FLIGHT = true;
   addAssistantMessage(message,'user');input.value='';
-  google.script.run.withSuccessHandler(function(reply){addAssistantMessage(reply||'No advice was returned.','bot');}).withFailureHandler(function(){addAssistantMessage('Assistant is unavailable. Please retry.','bot');}).BULBHUL_CHAT_API({empCode:AGENT_CODE,accessToken:ACCESS_TOKEN,message:message,leadId:CURRENT_LEAD_ID});
+  google.script.run.withSuccessHandler(function(reply){
+    ASSISTANT_CHAT_IN_FLIGHT = false;
+    addAssistantMessage(reply||'No advice was returned.','bot');
+  }).withFailureHandler(function(){
+    ASSISTANT_CHAT_IN_FLIGHT = false;
+    addAssistantMessage('Assistant is unavailable. Please retry.','bot');
+  }).BULBHUL_CHAT_API({empCode:AGENT_CODE,accessToken:ACCESS_TOKEN,message:message,leadId:CURRENT_LEAD_ID});
 }
 function p1ReadCaseFiles(fileList){
   const files=Array.from(fileList||[]).slice(0,3);if(!files.length)return Promise.resolve([]);
