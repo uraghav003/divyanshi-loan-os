@@ -1863,10 +1863,11 @@ function doPost(e) {
     }
 
     // ── Public actions — no auth required ──
-    if (action === 'submit_lead')  return jsonResp_(P1_SMART_FORM_SUBMIT_(body.payload || body));
-    if (action === 'get_products') return jsonResp_({ ok: true, data: GET_ACTIVE_LOAN_PRODUCTS_() });
-    if (action === 'get_banks')    return jsonResp_({ ok: true, data: P1_GET_BANK_OPTIONS_MAP_() });
-    if (action === 'health_check') return jsonResp_(P1_PUBLIC_HEALTH_());
+    if (action === 'submit_lead')    return jsonResp_(P1_SMART_FORM_SUBMIT_(body.payload || body));
+    if (action === 'get_products')   return jsonResp_({ ok: true, data: GET_ACTIVE_LOAN_PRODUCTS_() });
+    if (action === 'get_banks')      return jsonResp_({ ok: true, data: P1_GET_BANK_OPTIONS_MAP_() });
+    if (action === 'health_check')   return jsonResp_(P1_PUBLIC_HEALTH_());
+    if (action === 'submit_feedback') return jsonResp_(SUBMIT_FEEDBACK_(body.payload || body));
 
     // ── Auth gate ──
     if (!auth) return jsonResp_({ ok: false, err: 'Unauthorized' });
@@ -2883,6 +2884,30 @@ function P1_ROLE_DASHBOARD_DAILY_() {
 }
 
 // Compatible with Sheet menu/manual execution and authenticated API calls.
+function SUBMIT_FEEDBACK_(p) {
+  try {
+    p = p || {};
+    const type    = String(p.type    || 'General').trim().slice(0, 30);
+    const rating  = Math.min(5, Math.max(1, Number(p.rating) || 0));
+    const message = String(p.message || '').trim().slice(0, 1000);
+    const empCode = String(p.empCode || '').trim().toUpperCase().slice(0, 20);
+    const page    = String(p.page    || '').trim().slice(0, 30);
+
+    if (!message) return { ok: false, err: 'Message required' };
+
+    const sh = GET_OR_CREATE_('FEEDBACK');
+    const headers = ['TIMESTAMP','EMP_CODE','TYPE','RATING','MESSAGE','PAGE'];
+    P1_ENSURE_HEADERS_(sh, headers);
+
+    const id = 'FB_' + Date.now().toString(36).toUpperCase();
+    sh.appendRow([new Date(), empCode || 'ANONYMOUS', type, rating || '', message, page]);
+    return { ok: true, id: id };
+  } catch (err) {
+    LOG_ERR_('SUBMIT_FEEDBACK_', '', err.message);
+    return { ok: false, err: 'Could not save feedback' };
+  }
+}
+
 function SYNC_ROLE_DASHBOARDS_ENGINE(d) {
   if (d && typeof d === 'object' && Object.keys(d).length) {
     const actor = P1_REQUIRE_API_ACTOR_(d);
