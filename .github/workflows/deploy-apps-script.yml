@@ -19,13 +19,15 @@ jobs:
       - name: Check deployment authorization
         id: authorization
         run: |
-          if [ -z "$GOOGLE_CREDENTIALS" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment authorization is not configured; source validation remains available."
-          else
+          if [ -n "$GOOGLE_CREDENTIALS" ] || ([ -n "$CLASP_CLIENT_ID" ] && [ -n "$CLASP_CLIENT_SECRET" ] && [ -n "$CLASP_REFRESH_TOKEN" ]); then
             echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Deployment authorization configured via secrets."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No clasp/GCP static secrets found. The workflow will try Workload Identity if that is configured; otherwise it will stop with an actionable message."
           fi
 
+      # --- Option 1: existing clasp flow using GOOGLE_CREDENTIALS or CLASP_* secrets ---
       - name: Setup Node.js
         if: steps.authorization.outputs.configured == 'true'
         uses: actions/setup-node@v6
@@ -79,6 +81,42 @@ jobs:
           console.log('Clasp credentials successfully configured.');
           NODE
 
-      - name: Push to Apps Script
+      - name: Push to Apps Script (clasp)
         if: steps.authorization.outputs.configured == 'true'
         run: clasp push --force
+
+      # --- Option 2: Workload Identity (recommended secure alternative) ---
+      # This branch runs if no clasp static secrets are provided but the repository has
+      # the GCP Workload Identity provider and service account configured as secrets.
+      - name: Authenticate to GCP via Workload Identity
+        if: steps.authorization.outputs.configured == 'false' && (secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '')
+        uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud SDK
+        if: steps.authorization.outputs.configured == 'false' && (secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '')
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_email: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          export_default_credentials: true
+
+      - name: Run deploy.sh using gcloud-authenticated session
+        if: steps.authorization.outputs.configured == 'false' && (secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '')
+        run: |
+          chmod +x ./deploy.sh || true
+          bash ./deploy.sh
+
+      # --- If nothing is configured, fail with clear instructions ---
+      - name: No deployment credentials available
+        if: steps.authorization.outputs.configured == 'false' && (secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' || secrets.GCP_SERVICE_ACCOUNT == '')
+        run: |
+          echo "ERROR: Deployment not configured."
+          echo "Provide one of the following to enable automatic deploy:"
+          echo "  1) Set repository secret GOOGLE_CREDENTIALS (JSON with client_id, client_secret, refresh_token)" 
+          echo "  2) Set repository secrets: CLASP_CLIENT_ID, CLASP_CLIENT_SECRET, CLASP_REFRESH_TOKEN"
+          echo "  3) (Recommended) Configure Workload Identity federation and set secrets: GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT (and optionally GCP_PROJECT_ID)."
+          echo "See .github/GOOGLE_OAUTH_SETUP.md in the repository for detailed steps." 
+          exit 1
